@@ -479,6 +479,9 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
   thisGr=NULL;
 
   /*add noise photons*/
+  #ifdef DEBUG
+  fprintf(stdout,"Adding %d noise over %f signal %d\n",nNoise,photonCount->H,nPhotons);
+  #endif
   for(i=0;i<nNoise;i++){
     thisZ=(maxZ-minZ)*((float)rand()/(float)RAND_MAX)+minZ;
 
