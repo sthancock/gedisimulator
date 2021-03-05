@@ -12,6 +12,7 @@
 #include "libOctree.h"
 #include "gediIO.h"
 #include "gediNoise.h"
+#include "time.h"
 
 #define USEPHOTON
 
@@ -1651,11 +1652,14 @@ void photonCountCloud(float *denoised,dataStruct *data,photonStruct *photonCount
 
 control *readCommands(int argc,char **argv)
 {
-  int i=0;
+  int i=0,j=0;
   control *dimage=NULL;
   void setDenoiseDefault(denPar *);
   void readPulse(denPar *);
   void writeHelp();
+
+  /*by default, set the seed as time. Can be overridden later*/
+  srand((long)time(NULL));
 
   /*allocate structures*/
   if(!(dimage=(control *)calloc(1,sizeof(control)))){
@@ -1833,7 +1837,7 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-seed",5)){
         checkArguments(1,i,argc,"-seed");
         srand(atoi(argv[++i]));
-        rand();
+        for(j=0;j<atoi(argv[i]);j++)rand();
       }else if(!strncasecmp(argv[i],"-meanN",5)){
         checkArguments(1,i,argc,"-meanN");
         dimage->gediIO.den->meanN=atof(argv[++i]);
