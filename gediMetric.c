@@ -1660,6 +1660,7 @@ control *readCommands(int argc,char **argv)
 
   /*by default, set the seed as time. Can be overridden later*/
   srand((long)time(NULL));
+  for(j=0;j<(int)(time(NULL)%50);j++)rand();
 
   /*allocate structures*/
   if(!(dimage=(control *)calloc(1,sizeof(control)))){
