@@ -485,6 +485,7 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
 
   /*choose a number of signal photons to use*/
   photThresh=(float)rand()/(float)RAND_MAX;
+fprintf(stderr,"photThresh %f\n",photThresh);
   nPhotons=(int)pickArrayElement(photThresh,photonCount->prob,photonCount->pBins,0);
 
   /*generate noise photons*/
