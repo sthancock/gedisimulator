@@ -1833,6 +1833,7 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-seed",5)){
         checkArguments(1,i,argc,"-seed");
         srand(atoi(argv[++i]));
+        rand();
       }else if(!strncasecmp(argv[i],"-meanN",5)){
         checkArguments(1,i,argc,"-meanN");
         dimage->gediIO.den->meanN=atof(argv[++i]);
