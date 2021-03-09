@@ -435,7 +435,7 @@ float *countWaveform(float *denoised,dataStruct *data,photonStruct *photonCount,
         shotNoise=GaussNoise()*shotSig;
 
         /*add noise and truncate negative*/
-        temp[i]+=round(shotNoise);
+        temp[i]+=(float)round(shotNoise);
         if(temp[i]<0.0)temp[i]=0.0;
       }/*return check*/
     }/*bin loop*/
@@ -527,6 +527,7 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
   #ifdef DEBUG
   fprintf(stdout,"Adding %d noise over %f signal %d\n",nNoise,photonCount->H,nPhotons);
   #endif
+
   for(i=0;i<nNoise;i++){
     thisZ=(maxZ-minZ)*((float)rand()/(float)RAND_MAX)+minZ;
 
