@@ -880,7 +880,6 @@ float poissonPDF(float n,float lambda)
 float pickArrayElement(float photThresh,float *jimlad,int nBins,char interpolate)
 {
   int i=0;
-  int start=0,end=0;
   float x=0,y0=0;
   float tot=0,*cumul=NULL;
 
