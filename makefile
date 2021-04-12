@@ -13,6 +13,7 @@ MIN=mpfit.o
 ARCH=$(shell uname -m)
 
 CC = gcc
+#CC = i686-w64-mingw32-gcc
 
 THIS=gediRat
 
