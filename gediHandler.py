@@ -75,6 +75,8 @@ class gediData(object):
       print(b)
       if((b in list(f))==False): # does this exist?
         continue                 # if not, skip it
+      elif(('geolocation' in list(f[b]))==False):  # no data in bea,
+        continue
 
       # read the coords and determine output
       allLat=(np.array(f[b]['geolocation']['latitude_bin0'])+np.array(f[b]['geolocation']['latitude_lastbin']))/2.0

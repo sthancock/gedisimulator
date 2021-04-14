@@ -49,6 +49,8 @@ class gediData(object):
     for b in self.beamList:
       if((b in list(f))==False): # does this exist?
         continue                 # if not, skip it
+      elif(('geolocation' in list(f[b]))==False):  # no data in bea,
+        continue
 
       print(b)
 
