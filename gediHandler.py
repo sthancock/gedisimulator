@@ -475,6 +475,12 @@ class gediData(object):
               botBin=binList[0][j]
               break
 
+      # in case the search above has failed, use the whole bounds
+      if(topBin<0):
+        topBin=0
+      if(botBin>=self.z.shape[0]):
+        botBin=self.z.shape[0]-1
+
     return(self.z[botBin]-buff,self.z[topBin]+buff)
 
   ###########################################
