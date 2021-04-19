@@ -384,6 +384,11 @@ class gediData(object):
       reflScale,meanN,stdev=self.meanNoise(i)
       # find bounds
       minX,maxX=self.findBounds(meanN,stdev,i)
+
+      # is there usable data?
+      if(abs(maxX-minX)<0.1):
+        continue
+
       # plot it
       #plt.plot(self.wave[i],self.z,label='Waveform')
       #plt.plot(self.gWave[i]*reflScale+meanN,z,label='Ground')
@@ -444,27 +449,31 @@ class gediData(object):
 
     thresh=3.5*stdev+meanN
 
+    # set defaults
+    buff=0.0
+    topBin=0
+    botBin=self.wave[i].shape[0]-1
+
     # are we denoising?
     if(thresh>0.0):
       minWidth=3
       binList=np.where(self.wave[i]>thresh)
       buff=15
 
-      topBin=0
-      for j in range(0,len(binList[0])):
-        if (binList[0][j]==(binList[0][j-1]+1))&(binList[0][j]==(binList[0][j-2]+2)):
-          topBin=binList[0][j]
-          break
+      if(len(binList)>0):
+        if(len(binList[0])>3):
 
-      botBin=binList[len(binList)-1]
-      for j in range(len(binList[0])-1,0,-1):
-        if (binList[0][j]==(binList[0][j-1]+1))&(binList[0][j]==(binList[0][j-2]+2)):
-          botBin=binList[0][j]
-          break
-    else:
-      buff=0.0
-      topBin=0
-      botBin=self.wave[i].shape[0]-1
+          topBin=0
+          for j in range(0,len(binList[0])):
+            if (binList[0][j]==(binList[0][j-1]+1))&(binList[0][j]==(binList[0][j-2]+2)):
+              topBin=binList[0][j]
+              break
+
+          botBin=binList[0][len(binList)-1]
+          for j in range(len(binList[0])-1,0,-1):
+            if (binList[0][j]==(binList[0][j-1]+1))&(binList[0][j]==(binList[0][j-2]+2)):
+              botBin=binList[0][j]
+              break
 
     return(self.z[botBin]-buff,self.z[topBin]+buff)
 
