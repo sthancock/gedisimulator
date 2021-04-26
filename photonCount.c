@@ -526,7 +526,7 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
 
   /*choose a number of signal photons to use*/
   photThresh=(float)rand()/(float)RAND_MAX;
-  nPhotons=(int)pickArrayElement(photThresh,photonCount->prob,photonCount->pBins,0);
+  nPhotons=(int)pickArrayElement(photThresh,photonCount->prob,photonCount->pBins,1);
 
   /*generate noise photons*/
   if(photonCount->noise_mult>TOL)nNoise=setNumberNoise(data->cov,photonCount->noise_mult,photonCount->H);
@@ -800,7 +800,7 @@ int setNumberNoise(float cov,float noise_mult,float H)
     /*pick from a Poisson*/
     setPhotonProb(&tempPhot);
     photThresh=(float)rand()/(float)RAND_MAX;
-    nNoise=(int)pickArrayElement(photThresh,tempPhot.prob,tempPhot.pBins,0);
+    nNoise=(int)pickArrayElement(photThresh,tempPhot.prob,tempPhot.pBins,1);
     TIDY(tempPhot.prob);
   }else nNoise=0;
 
