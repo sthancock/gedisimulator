@@ -529,7 +529,8 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
   nPhotons=(int)pickArrayElement(photThresh,photonCount->prob,photonCount->pBins,0);
 
   /*generate noise photons*/
-  nNoise=setNumberNoise(data->cov,photonCount->noise_mult,photonCount->H);
+  if(photonCount->noise_mult>TOL)nNoise=setNumberNoise(data->cov,photonCount->noise_mult,photonCount->H);
+  else                           nNoise=0;
   *nPhot=nPhotons+nNoise;
 
   /*allocate space*/
