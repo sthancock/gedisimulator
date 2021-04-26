@@ -1294,7 +1294,6 @@ gediHDF *readGediHDF(char *namen,gediIOstruct *gediIO)
 {
   hid_t file;         /* Handles */
   gediHDF *hdfData=NULL;
-  void checkNwavesDF(int,int);
   void readSimGediHDF(hid_t,gediIOstruct *,char *,gediHDF *);
   void readRealGediHDF(hid_t,gediIOstruct *,char *,gediHDF *);
 
@@ -1330,7 +1329,7 @@ void readSimGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfData
   int nWaves=0,nBins=0;
   int *tempI=NULL,ind=0;
   float *tempF=NULL;
-  void checkNwavesDF(int,int);
+  void checkNwavesDF(int,int,char *);
 
   /*sims do not have variable lengths*/
   hdfData->nBins=ialloc(1,"nBins",0);
@@ -1371,30 +1370,30 @@ void readSimGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfData
 
   /*read ancillary data*/
   hdfData->z0=read1dFloatHDF5(file,"Z0",&nWaves);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"Z0");
   hdfData->zN=read1dFloatHDF5(file,"ZN",&nWaves);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"ZN");
   if(gediIO->ground){
     hdfData->slope=read1dFloatHDF5(file,"SLOPE",&nWaves);
-    checkNwavesDF(nWaves,hdfData->nWaves);
+    checkNwavesDF(nWaves,hdfData->nWaves,"SLOPE");
     hdfData->gElev=read1dFloatHDF5(file,"ZG",&nWaves);
-    checkNwavesDF(nWaves,hdfData->nWaves);
+    checkNwavesDF(nWaves,hdfData->nWaves,"ZG");
   }
   hdfData->beamDense=read1dFloatHDF5(file,"BEAMDENSE",&nWaves);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"BEAMDENSE");
   hdfData->pointDense=read1dFloatHDF5(file,"POINTDENSE",&nWaves);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"POINTDENSE");
   hdfData->zen=read1dFloatHDF5(file,"INCIDENTANGLE",&nWaves);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"INCIDENTANGLE");
   hdfData->lon=read1dDoubleHDF5(file,"LON0",&nWaves);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"LON0");
   hdfData->lat=read1dDoubleHDF5(file,"LAT0",&nWaves);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"LAT0");
   hdfData->waveID=read15dCharHDF5(file,"WAVEID",&nWaves,&nBins);
-  checkNwavesDF(nWaves,hdfData->nWaves);
+  checkNwavesDF(nWaves,hdfData->nWaves,"WAVEID");
   if(hdfData->nPbins>0){
     hdfData->pulse=read1dFloatHDF5(file,"PULSE",&nBins);
-    checkNwavesDF(nBins,hdfData->nPbins);
+    checkNwavesDF(nBins,hdfData->nPbins,"PULSE");
     tempF=read1dFloatHDF5(file,"PRES",&nWaves);
     hdfData->pRes=*tempF;
     TIDY(tempF);
@@ -1423,34 +1422,34 @@ void readSimGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfData
   if(gediIO->useInt){
     ind=0;
     hdfData->wave[ind]=read15dFloatHDF5(file,"RXWAVEINT",&nWaves,&nBins);
-    checkNwavesDF(nWaves,hdfData->nWaves);
-    checkNwavesDF(nBins,hdfData->nBins[0]);
+    checkNwavesDF(nWaves,hdfData->nWaves,"RXWAVEINT");
+    checkNwavesDF(nBins,hdfData->nBins[0],"RXWAVEINT");
     if(gediIO->ground){
       hdfData->ground[ind]=read15dFloatHDF5(file,"GRWAVEINT",&nWaves,&nBins);
-      checkNwavesDF(nWaves,hdfData->nWaves);
-      checkNwavesDF(nBins,hdfData->nBins[0]);
+      checkNwavesDF(nWaves,hdfData->nWaves,"GRWAVEINT");
+      checkNwavesDF(nBins,hdfData->nBins[0],"GRWAVEINT");
     }
   }
   if(gediIO->useCount){
     ind=(int)gediIO->useInt;
     hdfData->wave[ind]=read15dFloatHDF5(file,"RXWAVECOUNT",&nWaves,&nBins);
-    checkNwavesDF(nWaves,hdfData->nWaves);
-    checkNwavesDF(nBins,hdfData->nBins[0]);
+    checkNwavesDF(nWaves,hdfData->nWaves,"RXWAVECOUNT");
+    checkNwavesDF(nBins,hdfData->nBins[0],"RXWAVECOUNT");
     if(gediIO->ground){
       hdfData->ground[ind]=read15dFloatHDF5(file,"GRWAVECOUNT",&nWaves,&nBins);
-      checkNwavesDF(nWaves,hdfData->nWaves);
-      checkNwavesDF(nBins,hdfData->nBins[0]);
+      checkNwavesDF(nWaves,hdfData->nWaves,"GRWAVECOUNT");
+      checkNwavesDF(nBins,hdfData->nBins[0],"GRWAVECOUNT");
     }
   }
   if(gediIO->useFrac){
     ind=(int)(gediIO->useInt+gediIO->useCount);
     hdfData->wave[ind]=read15dFloatHDF5(file,"RXWAVEFRAC",&nWaves,&nBins);
-    checkNwavesDF(nWaves,hdfData->nWaves);
-    checkNwavesDF(nBins,hdfData->nBins[0]);
+    checkNwavesDF(nWaves,hdfData->nWaves,"RXWAVEFRAC");
+    checkNwavesDF(nBins,hdfData->nBins[0],"RXWAVEFRAC");
     if(gediIO->ground){
       hdfData->ground[ind]=read15dFloatHDF5(file,"GRWAVEFRAC",&nWaves,&nBins);
-      checkNwavesDF(nWaves,hdfData->nWaves);
-      checkNwavesDF(nBins,hdfData->nBins[0]);
+      checkNwavesDF(nWaves,hdfData->nWaves,"GRWAVEFRAC");
+      checkNwavesDF(nBins,hdfData->nBins[0],"GRWAVEFRAC");
     }
   }
 
@@ -2048,10 +2047,10 @@ void setBeamsToRead(char *useBeam,char *instruction)
 /*####################################################*/
 /*check that number of waves match*/
 
-void checkNwavesDF(int nRead,int nWaves)
+void checkNwavesDF(int nRead,int nWaves,char *varName)
 {
   if(nRead!=nWaves){
-    fprintf(stderr,"number of waves mismatch: read %d, expecting %d\n",nRead,nWaves);
+    fprintf(stderr,"number of waves mismatch for %s: read %d, expecting %d\n",varName,nRead,nWaves);
     exit(1);
   }
 

@@ -285,7 +285,7 @@ typedef struct{
   float fSigma;    /*footprint width*/
   float *pulse;    /*pulse*/
   float pRes;      /*pulse resolution*/
-  int nPbins;      /*number ofpulse bins*/
+  int nPbins;      /*number of pulse bins*/
   /*beams*/
   int nTypeWaves;  /*number of waveform types (frac, count and int)*/
   float **wave;    /*waveform*/
