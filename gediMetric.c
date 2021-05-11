@@ -275,10 +275,11 @@ int main(int argc,char **argv)
       determineTruth(data,dimage);
 
       /*add noise if needed*/
-      if(!dimage->gediIO.pclPhoton){
+      if((!dimage->gediIO.pclPhoton)&&(!dimage->gediIO.photonWave)){
         addNoise(data,&dimage->noise,dimage->gediIO.fSigma,dimage->gediIO.pSigma,dimage->gediIO.res,rhoC,rhoG);
         if(dimage->gediIO.pcl)pclWave=data->noised;
-      }else if(dimage->gediIO.pclPhoton)pclWave=data->wave[data->useType];
+      }else if(dimage->gediIO.photonWave)data->noised=countWaveform(data->wave[data->useType],data,&dimage->photonCount,dimage->gediIO.den,&dimage->noise);
+      else if(dimage->gediIO.pclPhoton)pclWave=data->wave[data->useType];
 
 
       /*do pcl if needed*/
@@ -1776,6 +1777,7 @@ control *readCommands(int argc,char **argv)
   dimage->readL2=0;   /*do not read L2*/
   /*photon counting*/
   dimage->ice2=0;             /*GEDI mode, rather than ICESat-2*/
+  dimage->gediIO.photonWave=0;
   #ifdef USEPHOTON
   dimage->photonCount.designval=2.1;
   dimage->photonCount.prob=NULL;
@@ -2015,6 +2017,8 @@ control *readCommands(int argc,char **argv)
       #ifdef USEPHOTON
       }else if(!strncasecmp(argv[i],"-photonCount",12)){
         dimage->ice2=1;
+      }else if(!strncasecmp(argv[i],"-photonWave",11)){
+        dimage->gediIO.photonWave=1;
       }else if(!strncasecmp(argv[i],"-photonPCL",10)){
         dimage->gediIO.pclPhoton=1;        /*Pulse compression lidar with photon counting*/
       }else if(!strncasecmp(argv[i],"-pcl",4)){
@@ -2119,7 +2123,8 @@ void writeHelp()
 -minGap gap;      delete signal beneath min detectable gap fraction\n");
   #ifdef USEPHOTON
   fprintf(stdout,"\nPhoton counting\n\
--photonCount;     output point cloud from photon counting\n\
+-photonCount;     output point cloud from photon-counting\n\
+-photonWave;      make a pseudo-waveform from photon-counting\n\
 -nPhotons n;      mean number of photons\n\
 -photonWind x;    twice window length for photon counting search, metres (2 way distance)\n\
 -noiseMult x;     noise multiplier for photon-counting. Noise photon rate in micro Hz\n\
