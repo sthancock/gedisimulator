@@ -1876,6 +1876,9 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-varScale");
         dimage->gediIO.den->varNoise=1;
         dimage->gediIO.den->threshScale=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-tailScale",10)){
+        checkArguments(1,i,argc,"-tailScale");
+        dimage->gediIO.den->tailThresh=atof(argv[++i]);;
       }else if(!strncasecmp(argv[i],"-noiseTrack",11)){
         dimage->gediIO.den->noiseTrack=1;
       }else if(!strncasecmp(argv[i],"-pFile",6)){
@@ -2136,6 +2139,7 @@ void writeHelp()
 -thresh n;        noise threshold, if using a predefined noise threshold\n\
 -varNoise;        use a variable noise threshold\n\
 -varScale x;      variable noise threshold scale (multiple of stdev above mean to set threshold)\n\
+-tailScale x;     variable noise threshold scale for trailing edge. Equal to varScale by default (multiple of stdev above mean to set threshold)\n\
 -statsLen len;    length to calculate noise stats over for varNoise\n\
 -noiseTrack;      use noise tracking\n\
 -sWidth sig;      smoothing width, after denoising\n\
