@@ -465,12 +465,15 @@ pulseData *readHDFdata(char *namen,control *dimage)
   uint64_t *sInds=NULL;
   uint16_t *nBins=NULL;
   float **readGEDItxwave(hid_t,uint64_t *,uint16_t *,int,int);
+  float **readLVIStxwave(hid_t,int *,int *);
   float **tempWave=NULL;
   hid_t file;
   hid_t group=0;
   pulseData *data=NULL;
   char **setGEDIbeamList(int *,char *);
   char **beamList=NULL;
+  char isGEDI=0;
+
 
 
 // >>> x=np.array(f['BEAM0001']['txwaveform'])
@@ -484,33 +487,50 @@ pulseData *readHDFdata(char *namen,control *dimage)
   /*open the file*/
   file=H5Fopen(namen,H5F_ACC_RDONLY,H5P_DEFAULT);
 
-  /*which beams to read*/
+  /*beams to read if GEDI*/
   beamList=setGEDIbeamList(&nBeams,dimage->useBeam);
+
+  /*determine if this is GEDI or LVIS data*/
+  isGEDI=0;
+  for(i=0;i<nBeams;i++){
+    if(H5Lexists(file,beamList[i],H5P_DEFAULT)==1){
+      isGEDI=1;
+      break;
+    }
+  }
+
+  if(!isGEDI)nBeams=1;
+
 
   /*loop over beams and read all*/
   for(i=0;i<nBeams;i++){
-    /*does this beam exist in this file?*/
-    if(H5Lexists(file,beamList[i],H5P_DEFAULT)==0){
-      i++;
-      continue;
-    }/*beam exists check*/
+    /*GEDI or LVIS data?*/
+    if(isGEDI){
+      /*does this beam exist in this file?*/
+      if(H5Lexists(file,beamList[i],H5P_DEFAULT)==0){
+        i++;
+        continue;
+      }/*beam exists check*/
 
-    /*open beam group*/
-    group=H5Gopen2(file,beamList[i],H5P_DEFAULT);
+      /*open beam group*/
+      group=H5Gopen2(file,beamList[i],H5P_DEFAULT);
 
-    /*read the data*/
-    sInds=read1dUint64HDF5(group,"tx_sample_start_index",&numb);
-    nWaves=numb;
+      /*read the data*/
+      sInds=read1dUint64HDF5(group,"tx_sample_start_index",&numb);
+      nWaves=numb;
 
-    /*find the longest waveform*/
-    nBins=read1dUint16HDF5(group,"tx_sample_count",&numb);
-    data->nBins=0;
-    for(j=0;j<numb;j++){
-      if((int)nBins[i]>data->nBins)data->nBins=(int)nBins[i];
+      /*find the longest waveform*/
+      nBins=read1dUint16HDF5(group,"tx_sample_count",&numb);
+      data->nBins=0;
+      for(j=0;j<numb;j++){
+        if((int)nBins[i]>data->nBins)data->nBins=(int)nBins[i];
+      }
+
+      /*read TX waveform*/
+      tempWave=readGEDItxwave(group,sInds,nBins,data->nBins,nWaves);
+    }else{
+      tempWave=readLVIStxwave(file,&data->nBins,&nWaves);
     }
-
-    /*read TX waveform*/
-    tempWave=readGEDItxwave(group,sInds,nBins,data->nBins,nWaves);
 
     /*add waveform to end*/
     fprintf(stdout,"Adding %d waves for a total of %d\n",nWaves,data->nWaves+nWaves);
@@ -546,7 +566,33 @@ pulseData *readHDFdata(char *namen,control *dimage)
 
 
 /*############################################################*/
-/*read and unpack the tx waveforms*/
+/*read and unpack the tx waveforms from LVIS data*/
+
+float **readLVIStxwave(hid_t group,int *nBins,int *nWaves)
+{
+  int i=0,j=0;
+  uint16_t **temp=NULL;
+  float **txwaves=NULL;
+
+fprintf(stdout,"Reading TXWAVE\n");
+  temp=read2dUint16HDF5(group,"TXWAVE",nBins,nWaves);
+fprintf(stdout,"Read TXWAVE\n");
+
+
+  /*copy to floats*/
+  txwaves=fFalloc(*nWaves,"txwaves",0);
+  for(i=0;i<*nWaves;i++){
+    txwaves[i]=falloc(*nBins,"txwaves",i+1);
+    for(j=0;j<*nBins;j++)txwaves[i][j]=(float)temp[0][i*(*nBins)+j];
+  }
+
+  TTIDY((void **)temp,1);
+  return(txwaves);
+}/*readLVIStxwave*/
+
+
+/*############################################################*/
+/*read and unpack the tx waveforms from GEDI data*/
 
 float **readGEDItxwave(hid_t group,uint64_t *sInds,uint16_t *nBins,int maxBins,int nWaves)
 {
