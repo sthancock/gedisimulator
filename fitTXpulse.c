@@ -225,7 +225,7 @@ float **fitPulseGauss(pulseData *data,int *meanBins,float oRes,float inRes,int m
     
 
     /*load into mean arrays*/
-    if(checkSignal){
+    if(checkSignal&&(CofG>-999.0)){
       for(i=0;i<data->nBins;i++){
         bin=(int)((x[i]-CofG)/oRes+0.5)+(*meanBins)/2;
         if((bin>=0)&&(bin<(*meanBins))){
@@ -416,7 +416,6 @@ pulseData *readData(char *namen,control *dimage)
 
   /*read data*/
   if(isHDF){
-fprintf(stdout,"Reading %s\n",namen);
     data=readHDFdata(namen,dimage);
   }else{ /*ascii*/
     data=readAsciiData(namen);
@@ -574,10 +573,7 @@ float **readLVIStxwave(hid_t group,int *nBins,int *nWaves)
   uint16_t **temp=NULL;
   float **txwaves=NULL;
 
-fprintf(stdout,"Reading TXWAVE\n");
   temp=read2dUint16HDF5(group,"TXWAVE",nBins,nWaves);
-fprintf(stdout,"Read TXWAVE\n");
-
 
   /*copy to floats*/
   txwaves=fFalloc(*nWaves,"txwaves",0);
