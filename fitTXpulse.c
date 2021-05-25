@@ -702,7 +702,7 @@ control *readCommands(int argc,char **argv)
   strcpy(dimage->inNamen,"/Users/stevenhancock/data/teast/pulse/howland.waves");
   strcpy(dimage->outNamen,"teast.dat");
   dimage->oRes=0.15;
-  dimage->inRes=0.3;
+  dimage->inRes=0.15;
   dimage->minN=100;
   dimage->txStats=0;
   dimage->useBeam[0]=dimage->useBeam[1]=dimage->useBeam[2]=dimage->useBeam[3]=\
