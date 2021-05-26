@@ -292,7 +292,7 @@ int main(int argc,char **argv)
         /*process waveform*/
         /*denoise, or*if we are doing PCL on photon counting, convert to photon count*/
         denoised=processFloWave(data->noised,data->nBins,dimage->gediIO.den,1.0);
-      }
+      }else denoised=NULL;
 
       /*check that the wave is still usable*/
       if(denoised&&checkUsable(denoised,data->nBins)){

@@ -49,7 +49,7 @@
 /*########################################################################*/
 
 /*tolerances*/
-#define TOL 0.00001
+#define TOL 0.0000001
 
 
 /*####################################################*/
@@ -395,6 +395,7 @@ float *countWaveform(float *denoised,dataStruct *data,photonStruct *photonCount,
   #ifdef DEBUG
   static int count=0;
   fprintf(stdout,"Photon counting\n");
+  fflush(stdout);
   #endif
 
   /*set minimum to zero*/
@@ -426,6 +427,8 @@ float *countWaveform(float *denoised,dataStruct *data,photonStruct *photonCount,
 
   #ifdef DEBUG
   for(i=0;i<data->nBins;i++)fprintf(stdout,"%d %f %f %f ta\n",count,data->z[i],temp[i],data->wave[0][i]);
+  fflush(stdout);
+  fprintf(stderr,"count %d\n",count);fflush(stderr);
   count++;
   #endif
 
@@ -440,7 +443,7 @@ void applyShotNoise(float *temp,int nBins)
 {
   int i=0,bin=0;
   int lostPhots=0;
-  int nCulled=0;
+  int nCulled=0,totIn=0;
   float shotSig=0;
   float shotNoise=0;
   float photThresh=0;
@@ -449,7 +452,7 @@ void applyShotNoise(float *temp,int nBins)
   /*loop over bins*/
   for(i=0;i<nBins;i++){
     /*only if there are photons*/
-    if(temp[i]>0.0){
+    if(temp[i]>TOL){
       /*set sigma*/
       shotSig=sqrt(temp[i]);
 
@@ -459,33 +462,39 @@ void applyShotNoise(float *temp,int nBins)
       /*count truncated negative*/
       temp[i]+=shotNoise;
       if(temp[i]<0.0){
-        lostPhots-=(int)temp[i];
+        lostPhots-=(int)(temp[i]+0.5);
         temp[i]=0.0;
       }
+
+      totIn+=(int)(temp[i]+0.5);
     }/*return check*/
   }/*bin loop*/
 
   /*redeploy negative numbers*/
   if(lostPhots>0){
-    mask=falloc(nBins,"temporary mask",0);
-    nCulled=0;
+    if(lostPhots>=totIn){  /*have we lost so many that the signal is empty?*/
+      for(i=0;i<nBins;i++)temp[i]=0.0;
+    }else{                 /*otherwise redeploy negative numbers*/
+      mask=falloc(nBins,"temporary mask",0);
+      nCulled=0;
 
-    while(nCulled<lostPhots){
-      /*make the mask array*/
-      for(i=0;i<nBins;i++){
-        if(temp[i]>0.0)mask[i]=1.0;
-        else           mask[i]=0.0;
-      }
+      while(nCulled<lostPhots){
+        /*make the mask array*/
+        for(i=0;i<nBins;i++){
+          if(temp[i]>0.0)mask[i]=1.0;
+          else           mask[i]=0.0;
+        }
 
-      photThresh=(float)rand()/(float)RAND_MAX;
-      bin=(int)pickArrayElement(photThresh,mask,nBins,0);
-      if(temp[bin]>0.0){
-        temp[bin]-=1.0;
-        nCulled++;
+        photThresh=(float)rand()/(float)RAND_MAX;
+        bin=(int)pickArrayElement(photThresh,mask,nBins,0);
+        if(temp[bin]>0.0){
+          temp[bin]-=1.0;
+          nCulled++;
+        }
       }
-    }
-    TIDY(mask);
-  }
+      TIDY(mask);
+    }/*redploy lost photons*/
+  }/*lost photon check*/
 
   return;
 }/*applyShotNoise*/
