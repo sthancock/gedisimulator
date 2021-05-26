@@ -763,11 +763,12 @@ control *readCommands(int argc,char **argv)
   /*total number of beams*/
   dimage->gediIO.nTypeWaves=dimage->gediIO.useCount+dimage->gediIO.useFrac+dimage->gediIO.useInt;
 
-  /*ensure pulse is Nyquist sampled*/
-  if(dimage->gediIO.readPulse==0)dimage->gediIO.pRes=dimage->gediIO.res/4.0;
+  /*ensure pulse is sampled at same rate as waveform*/
+  if(dimage->gediIO.readPulse==0)dimage->gediIO.pRes=dimage->gediIO.res;
 
   return(dimage);
 }/*readCommands*/
+
 
 /*####################################*/
 /*Help message*/
