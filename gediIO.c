@@ -4155,7 +4155,7 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
             tempGr[k][i]+=waves->ground[k][bin]*gediIO->pulse->y[j];
             tempC[k][i]+=waves->canopy[k][bin]*gediIO->pulse->y[j];
           }
-          contN+=1.0; //gediIO->pulse->y[j]-minPulse;
+          contN+=gediIO->pulse->y[j]-minPulse;
         }/*bin bound check*/
       }/*pulse bin loop*/
 
