@@ -2048,6 +2048,9 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-photHDF",8)){
         dimage->photonCount.writeHDF=1;
       #endif
+      }else if(!strncasecmp(argv[i],"-nMessages",10)){
+        checkArguments(1,i,argc,"-nMessages");
+        dimage->gediIO.nMessages=atoi(argv[++i]);;
       }else if(!strncasecmp(argv[i],"-help",5)){
         writeHelp();
         exit(1);
@@ -2089,6 +2092,7 @@ void writeHelp()
 -beamList 11111111; 0/1 for whether or not to use beams 1-8\n\
 -skipBeams n;     list of beam numbers to skip. No spaces between (eg 123)\n\
 -readBeams n;     list of beam numbers to read. No spaces between (eg 123)\n\
+-nMessages n;     number of progress messages to output\n\
 \nSwitches\n\
 -ground;          read true ground from file\n\
 -useInt;          use discrete intensity instead of count\n\
