@@ -151,7 +151,7 @@ void resamplePclPulse(pulseStruct *pulse,float res,float pRes)
 
   /*resample pulse*/
   for(i=0;i<pulse->nBins;i++){
-    bin=(int)((float)i*pRes/res);
+    bin=(int)floor((float)i*pRes/res);
     if((bin>=0)&&(bin<pulse->rBins)){
       pulse->resamp[bin]+=pulse->y[i];
       contN[bin]++;
@@ -163,7 +163,7 @@ void resamplePclPulse(pulseStruct *pulse,float res,float pRes)
     if(contN[i]>0)pulse->resamp[i]/=(float)contN[i];
   }
   TIDY(contN);
-  pulse->rCent=(int)((float)pulse->centBin*pRes/res);
+  pulse->rCent=(int)floor((float)pulse->centBin*pRes/res);
 
   return;
 }/*resamplePclPulse*/
