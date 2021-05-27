@@ -764,7 +764,7 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.nTypeWaves=dimage->gediIO.useCount+dimage->gediIO.useFrac+dimage->gediIO.useInt;
 
   /*ensure pulse is sampled at same rate as waveform*/
-  if(dimage->gediIO.readPulse==0)dimage->gediIO.pRes=dimage->gediIO.res/3.0;
+  if(dimage->gediIO.readPulse==0)dimage->gediIO.pRes=dimage->gediIO.res;
 
   return(dimage);
 }/*readCommands*/

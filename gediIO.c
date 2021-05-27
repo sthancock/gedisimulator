@@ -3207,11 +3207,9 @@ void setGediPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
 
 void readSimPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
 {
-  int i=0,bin=0,nBins=0,*contN=NULL;
+  int i=0;
   float CofG=0,tot=0,centre=0;
   float minSep=0,max=0;
-  float *temp=NULL,xStart=0;
-  float xDir=0;
   char line[400];
   char temp1[100],temp2[100];
   FILE *ipoo=NULL;
@@ -3246,41 +3244,6 @@ void readSimPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
     }
   }
   gediIO->pRes=fabs(gediIO->pulse->x[gediIO->pulse->nBins-1]-gediIO->pulse->x[0])/(float)(gediIO->pulse->nBins-1);
-
-  /*resample pulse to have same res as simulation*/
-  /*nBins=(int)((float)gediIO->pulse->nBins*gediIO->pRes/gediIO->res);
-  temp=falloc(nBins,"temp pulse",0);
-  contN=ialloc(nBins,"contN",0);
-  for(i=0;i<nBins;i++){
-    temp[i]=0.0;
-    contN[i]=0;
-  }
-  for(i=0;i<gediIO->pulse->nBins;i++){
-    bin=(int)((float)i*gediIO->pRes/gediIO->res);
-    if((bin>=0)&&(bin<nBins)){
-      temp[bin]+=gediIO->pulse->y[i];
-      contN[bin]++;
-    }
-  }
-  xStart=gediIO->pulse->x[0];
-  xDir=(gediIO->pulse->x[1]-gediIO->pulse->x[0])/fabs(gediIO->pulse->x[1]-gediIO->pulse->x[0]);
-  if(!(gediIO->pulse->x=(float *)realloc(gediIO->pulse->x,nBins*sizeof(float)))){
-    fprintf(stderr,"Error allocating memory\n");
-    exit(1);
-  }
-  if(!(gediIO->pulse->y=(float *)realloc(gediIO->pulse->y,nBins*sizeof(float)))){
-    fprintf(stderr,"Error allocating memory\n");
-    exit(1);
-  } 
-  for(i=0;i<nBins;i++){
-    if(contN[i]>0)gediIO->pulse->y[i]=temp[i]/(float)contN[i];
-    else          gediIO->pulse->y[i]=0.0;
-    gediIO->pulse->x[i]=xStart+xDir*gediIO->res;
-  }
-  gediIO->pRes=gediIO->res;
-  gediIO->pulse->nBins=nBins;
-  TIDY(temp);
-  TIDY(contN);*/
 
   /*determine maximum to centre and total to normalise*/
   tot=0.0;
@@ -4120,6 +4083,7 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
   }
 
 
+  /*allocate temporary space*/
   for(k=0;k<waves->nWaves;k++){
     temp[k]=falloc((uint64_t)waves->nBins,"temp waves",k+1);
     if(gediIO->ground){
@@ -4145,7 +4109,7 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
       for(j=0;j<gediIO->pulse->nBins;j++){
 
         /*waveform array bin*/
-        bin=i+(int)floor((float)(j-gediIO->pulse->centBin)*gediIO->pRes/gediIO->res+0.5);
+        bin=i+(int)floor((float)(j-gediIO->pulse->centBin+0.1)*gediIO->pRes/gediIO->res); //+0.0001);
 
         /*are we within the pulse array?*/
         if((bin>=0)&&(bin<waves->nBins)){
@@ -4155,7 +4119,7 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
             tempGr[k][i]+=waves->ground[k][bin]*gediIO->pulse->y[j];
             tempC[k][i]+=waves->canopy[k][bin]*gediIO->pulse->y[j];
           }
-          contN+=gediIO->pulse->y[j]-minPulse;
+          contN+=1.0; //gediIO->pulse->y[j]-minPulse;
         }/*bin bound check*/
       }/*pulse bin loop*/
 
