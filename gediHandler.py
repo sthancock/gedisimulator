@@ -187,18 +187,18 @@ class gediData(object):
       else:
         waveID=temp
       # split out the shot number
-      self.shotN=np.empty(nWaves,dtype=int)
+      #self.shotN=np.empty(nWaves,dtype=int)
       beamID=[]
       for i in range(0,nWaves):
         bits=waveID[i].split('.')
         if(len(bits)>=3):
-          self.shotN[i]=int(waveID[i].split('.')[2])
+          #self.shotN[i]=int(waveID[i].split('.')[2])
           beamID.append(waveID[i].split('.')[1])
         elif(len(bits)>1):
-          self.shotN[i]=int(waveID[i].split('.')[0])
+          #self.shotN[i]=int(waveID[i].split('.')[0])
           beamID.append(waveID[i].split('.')[0])
         else:
-          self.shotN[i]=int(waveID[i])
+          #self.shotN[i]=int(waveID[i])
           beamID.append(waveID[i])
       self.beamID=np.array(beamID)
       # read all other data

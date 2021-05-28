@@ -4109,7 +4109,8 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
       for(j=0;j<gediIO->pulse->nBins;j++){
 
         /*waveform array bin*/
-        bin=i+(int)floor((float)(j-gediIO->pulse->centBin+0.1)*gediIO->pRes/gediIO->res); //+0.0001);
+        if(!gediIO->pcl)bin=i+(int)floor((float)((gediIO->pulse->centBin-j)+0.1)*gediIO->pRes/gediIO->res);
+        else            bin=i+(int)floor((float)(j-gediIO->pulse->centBin+0.1)*gediIO->pRes/gediIO->res);
 
         /*are we within the pulse array?*/
         if((bin>=0)&&(bin<waves->nBins)){
