@@ -2337,7 +2337,7 @@ dataStruct *unpackHDFlvis(char *namen,lvisHDF **hdfLvis,gediIOstruct *gediIO,int
 
   dx=hdfLvis[0]->lon1023[numb]-hdfLvis[0]->lon0[numb];
   dy=hdfLvis[0]->lat1023[numb]-hdfLvis[0]->lat0[numb];
-  scale=(double)botBin/1024.0;
+  scale=(double)botBin/(double)hdfLvis[0]->nBins;
   data->lon=hdfLvis[0]->lon0[numb]+scale*dx;
   data->lat=hdfLvis[0]->lat0[numb]+scale*dy;
   data->lfid=hdfLvis[0]->lfid[numb];
