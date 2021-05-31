@@ -50,6 +50,8 @@ There are three ways to install the code.
 * Compile from souce: Do this of you are confident compiling C code
 * Compilation script: Automatically does the above. Do this if you don't have root access and are not confident compiling C code
 
+These three methods are listed below. Note that the compilation script will create a directory structure to install the code in to and modify your .bashrc file to point to these, so it is not recommended if you have a particular way you like your system set up.
+
 
 ##### Singularity container
 The simplest way to get set up is to use the script provided to build all programs within a [**singularity container**](https://www.sylabs.io/docs/). Download this [script](https://bitbucket.org/StevenHancock/gedisimulator/src/master/makeSingularity.txt), then build (in Linux) by the command below. **Note** that this requires root access. Singularity cannot be run on a Mac natively and must be built and run within a [virtual machine](https://www.sylabs.io/guides/2.6/user-guide/installation.html#install-on-mac).
@@ -110,7 +112,33 @@ Replace "**gediRat**" with each of the commands above to compile and install.
 Make sure that all **.csh** and **.bash** files are also in your path.
 
 
-# Function operation #
+### Compilation script
+
+There is a bash script that will create a directory structure, clone the necessary libraries that do not have package managres and compile the script. *Note* that the package managed libraries are still required and these should be installed first (Gnu Scientific Library, Geotiff, HDF5, GDAL).
+
+Download and run the script by typing the following commands in your terminal (Unix or Linux):
+
+   **wget https://bitbucket.org/StevenHancock/gedisimulator/src/master/installGedi.bash**
+   **chmod +x installGedi.bash**
+   **installGedi.bash**
+
+The will create the directory:
+
+  **$HOME/src**
+
+To clone the source code to and will compile the executables to:
+
+  **$HOME/bin**
+
+It will add that directory to your PATH so that your system will be able to find the commands. Afterwards you can test with:
+
+  **collocateWaves -help**
+
+Which, if it has worked, will print out the options for the collocateWaves tool.
+
+
+
+# Tool  operation #
 
 ## gediRat ##
 
