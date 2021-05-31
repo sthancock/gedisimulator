@@ -118,11 +118,11 @@ There is a bash script that will create a directory structure, clone the necessa
 
 Download and run the script by typing the following commands in your terminal (Unix or Linux):
 
-   **wget https://bitbucket.org/StevenHancock/gedisimulator/src/master/installGedi.bash**
+    wget https://bitbucket.org/StevenHancock/gedisimulator/src/master/installGedi.bash
 
-   **chmod +x installGedi.bash**
+    chmod +x installGedi.bash
 
-   **installGedi.bash**
+    installGedi.bash
 
 The will create the directory:
 
