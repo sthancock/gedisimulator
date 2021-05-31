@@ -59,7 +59,7 @@ git clone https://bitbucket.org/StevenHancock/tools
 git clone https://bitbucket.org/StevenHancock/gedisimulator
 
 
-programList="gediRat gediMetric mapLidar collocateWaves lasPoints"
+programList="gediRat gediMetric mapLidar collocateWaves lasPoints fitTXpulse"
 cd $GEDIRAT_ROOT/
 make clean
 

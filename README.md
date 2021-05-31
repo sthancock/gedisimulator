@@ -44,6 +44,12 @@ The other .c files are either small test programs in the development of the abov
 
 ### How do I get set up? ###
 
+There are three ways to install the code.
+
+* Singularity container: Simplest but needs root access to set up
+* Compile from souce: Do this of you are confident compiling C code
+* Compilation script: Automatically does the above. Do this if you don't have root access and are not confident compiling C code
+
 
 ##### Singularity container
 The simplest way to get set up is to use the script provided to build all programs within a [**singularity container**](https://www.sylabs.io/docs/). Download this [script](https://bitbucket.org/StevenHancock/gedisimulator/src/master/makeSingularity.txt), then build (in Linux) by the command below. **Note** that this requires root access. Singularity cannot be run on a Mac natively and must be built and run within a [virtual machine](https://www.sylabs.io/guides/2.6/user-guide/installation.html#install-on-mac).
