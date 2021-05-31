@@ -124,15 +124,15 @@ Download and run the script by typing the following commands in your terminal (U
 
 The will create the directory:
 
-  **$HOME/src**
+   ***$HOME/src***
 
 To clone the source code to and will compile the executables to:
 
-  **$HOME/bin**
+   ***$HOME/bin***
 
 It will add that directory to your PATH so that your system will be able to find the commands. Afterwards you can test with:
 
-  **collocateWaves -help**
+   collocateWaves -help
 
 Which, if it has worked, will print out the options for the collocateWaves tool.
 
