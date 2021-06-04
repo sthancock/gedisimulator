@@ -2096,7 +2096,7 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
 {
   int i=0;
   int sBin=0,eBin=0;
-  float zTop=0;
+  float zTop=0,maxP=0;
   float *setPulseRange(gediIOstruct *);
   double sOff=0,eOff=0;
   dataStruct *data=NULL;
@@ -2176,6 +2176,23 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
     gediIO->pulse->nBins=hdfGedi[0]->nPbins;
     gediIO->pRes=hdfGedi[0]->pRes;
     gediIO->pulse->x=setPulseRange(gediIO);
+
+    /*and copy in to denoising structure*/
+    gediIO->den->pBins=gediIO->pulse->nBins;
+    gediIO->den->pulse=fFalloc(2,"deconPulse",0);
+    gediIO->den->pulse[0]=falloc(gediIO->den->pBins,"deconPulse",1);
+    gediIO->den->pulse[1]=falloc(gediIO->den->pBins,"deconPulse",2);
+    memcpy(gediIO->den->pulse[0],gediIO->pulse->x,sizeof(float)*gediIO->den->pBins);
+    memcpy(gediIO->den->pulse[1],gediIO->pulse->y,sizeof(float)*gediIO->den->pBins);
+    gediIO->den->matchPulse=falloc(gediIO->den->pBins,"matchPulse",0);
+    memcpy(gediIO->den->matchPulse,gediIO->pulse->y,sizeof(float)*gediIO->den->pBins);
+    maxP=-10000.0;
+    for(i=0;i<gediIO->den->pBins;i++){
+      if(gediIO->den->pulse[1][i]>maxP){
+        maxP=gediIO->den->pulse[1][i];
+        gediIO->den->maxPbin=i;
+      }
+    }
   }else if(hdfGedi[0]->nPbins==0){
     gediIO->pulse=NULL;
   }/*pulse reading*/
@@ -3608,15 +3625,15 @@ gediHDF *setUpHDF(gediIOstruct *gediIO,gediRatStruct *gediRat,char useID,char *w
   }else hdfData->idLength=7;
 
   /*do we need to record the pulse*/
-  if(gediIO->readPulse){
+  //if(gediIO->readPulse){
     hdfData->pRes=gediIO->pRes;
     hdfData->nPbins=gediIO->pulse->nBins;
     hdfData->pulse=falloc((uint64_t)hdfData->nPbins,"hdf pulse",0);
     memcpy(hdfData->pulse,gediIO->pulse->y,sizeof(float)*hdfData->nPbins);
-  }else{
+  /*else{
     hdfData->pulse=NULL;
     hdfData->nPbins=0;
-  }
+  }*/
 
   /*allocate arrays*/
   hdfData->wave=fFalloc(hdfData->nTypeWaves,"hdf waveforms",0);

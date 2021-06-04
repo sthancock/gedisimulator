@@ -459,27 +459,37 @@ void checkWaveformBounds(dataStruct *data,control *dimage)
 void determineTruth(dataStruct *data,control *dimage)
 {
   int i=0;
-  float totE=0,cumul=0;
+  float totE=0,cumul=0,meanG=0;
   float groundOverlap(float *,float *,int);
   float groundMinAmp(float *,float *,int);
   float groundInflection(float *,float *,int);
+  float *matchedGr=NULL;
 
   /*determine ground*/
+  /*apply matched filter to remove assymmetry*/
+  matchedGr=matchedFilter(data->ground[data->useType],data->nBins,dimage->gediIO.den,data->res);
+
+  /*find the ground*/
   if(!data->demGround){  /*unless it's already been calculalated from the DEM*/
     if(dimage->gediIO.ground){
+
+      /*find CofG*/
       totE=0.0;
-      data->gElev=0.0;
+      data->gElev=meanG=0.0;
       for(i=0;i<data->nBins;i++){
         totE+=data->ground[data->useType][i];
-        data->gElev+=(double)data->ground[data->useType][i]*data->z[i];
+        data->gElev+=(double)matchedGr[i]*data->z[i];
+        meanG+=(double)data->ground[data->useType][i]*data->z[i];
       }
-      if(totE>0.0)data->gElev/=(double)totE;
-      else        data->gElev=-1000000.0;
+      if(totE>0.0){
+        data->gElev/=(double)totE;
+        meanG/=(double)totE;
+      }else data->gElev=meanG=-1000000.0;
 
       /*standard deviation as a measure of slope*/
       data->gStdev=0.0;
       for(i=0;i<data->nBins;i++){
-        data->gStdev+=(float)((data->z[i]-data->gElev)*(data->z[i]-data->gElev))*data->ground[data->useType][i];
+        data->gStdev+=(float)((data->z[i]-meanG)*(data->z[i]-meanG))*data->ground[data->useType][i];
       }
       if(totE>0.0){
         data->gStdev=sqrt(data->gStdev/totE);
