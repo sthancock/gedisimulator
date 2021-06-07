@@ -4603,6 +4603,33 @@ float findBlairSense(dataStruct *data,gediIOstruct *gediIO)
 }/*findBlairSense*/
 
 
+/*####################################################*/
+/*reshape waveform for rhoV rhoG*/
+
+void modifyGroundRho(dataStruct *data,float scaleRhoVrhoG)
+{
+  int i=0,j=0;
+  float newWave=0;
+
+  /*check there is a ground*/
+  if(data->ground==NULL){
+    fprintf(stderr,"Cannoy modify ground rates without ground classification\n");
+    exit(1);
+  }
+
+  /*loop over wave types*/
+  for(j=0;j<data->nWaveTypes;j++){
+    /*loop over bins*/
+    for(i=0;i<data->nBins;i++){
+      newWave=(data->wave[j][i]-data->ground[j][i])*scaleRhoVrhoG+data->ground[j][i];
+      data->totE[j]+=newWave-data->wave[j][i];
+      data->wave[j][i]=newWave;
+    }/*bin loop*/
+  }/*wave type loop*/
+
+  return;
+}/*modifyGroundRho*/
+
 /*the end*/
 /*####################################################*/
 

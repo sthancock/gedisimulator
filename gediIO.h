@@ -363,6 +363,7 @@ void packGEDIhdf(waveStruct *,gediHDF *,int,gediIOstruct *,gediRatStruct *,int *
 void setBeamsToUse(char *,char *);
 void setBeamsToSkip(char *,char *);
 void setBeamsToRead(char *,char *);
+void modifyGroundRho(dataStruct *,float);
 wFrontStruct *copyFrontFilename(char *);
 float waveformTrueCover(dataStruct *,gediIOstruct *,float);
 float findBlairSense(dataStruct *,gediIOstruct *);

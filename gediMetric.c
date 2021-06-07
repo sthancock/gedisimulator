@@ -144,10 +144,12 @@ typedef struct{
   photonStruct photonCount;  /*photon counting structure*/
 
   /*others*/
-  float rhoRatio; /*ration of canopy to ground reflectance*/
-  float gTol;     /*toleranve used to label ALS ground finding*/
-  float zen;      /*zenith angle*/
-  float fhdHistRes;/*resolution for FHD histogram method*/
+  float rhoRatio;      /*ratio of canopy to ground reflectance, used only for true canopy cover*/
+  float scaleRhoVrhoG; /*this is used to rescale the true waveform*/
+  char changeGrRho;    /*switch to rescale the true waveform*/
+  float gTol;          /*toleranve used to label ALS ground finding*/
+  float zen;           /*zenith angle*/
+  float fhdHistRes;    /*resolution for FHD histogram method*/
 }control;
 
 
@@ -268,8 +270,9 @@ int main(int argc,char **argv)
 
     /*is the data usable*/
     if(data->usable){
-      /*denoise and change pulse if needed*/
+      /*denoise and change pulse and ground if needed*/
       if(dimage->renoiseWave)modifyTruth(data,&dimage->noise);
+      if(dimage->changeGrRho)modifyGroundRho(data,dimage->scaleRhoVrhoG);
 
       /*determine truths before noising*/
       determineTruth(data,dimage);
@@ -1807,9 +1810,11 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.pclPhoton=0;  
   dimage->gediIO.writePcl=0;
   /*others*/
-  rhoG=0.4;
-  rhoC=0.57;
-  dimage->rhoRatio=rhoC/rhoG;
+  rhoG=0.4;                   /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
+  rhoC=0.57;                  /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
+  dimage->rhoRatio=rhoC/rhoG; /*these are used only for estimating true cover*/
+  dimage->scaleRhoVrhoG=1.0;  /*this is used to rescale the true waveform*/
+  dimage->changeGrRho=0;      /*do not rescale the true waveform*/
   dimage->gTol=0.0;
   dimage->gediIO.nMessages=200;
   dimage->fhdHistRes=0.001;
@@ -2048,9 +2053,6 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-noiseMult",10)){
         checkArguments(1,i,argc,"-noiseMult");
         dimage->photonCount.noise_mult=atof(argv[++i]);
-      }else if(!strncasecmp(argv[i],"-rhoVrhoG",9)){
-        checkArguments(1,i,argc,"-rhoVrhoG");
-        dimage->photonCount.rhoVrhoG=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-nPhotG",7)){
         checkArguments(1,i,argc,"-nPhotG");
         dimage->photonCount.nPhotG=atof(argv[++i]);
@@ -2060,6 +2062,10 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-photHDF",8)){
         dimage->photonCount.writeHDF=1;
       #endif
+      }else if(!strncasecmp(argv[i],"-rhoVrhoG",9)){
+        checkArguments(1,i,argc,"-rhoVrhoG");
+        dimage->scaleRhoVrhoG=atof(argv[++i]);
+        dimage->changeGrRho=1;
       }else if(!strncasecmp(argv[i],"-nMessages",10)){
         checkArguments(1,i,argc,"-nMessages");
         dimage->gediIO.nMessages=atoi(argv[++i]);;
@@ -2120,6 +2126,7 @@ void writeHelp()
 -dontTrustGround; don't trust ground in waveforms, if included\n\
 -noRoundCoord;    do not round up coords when outputting\n\
 -noCanopy;        do not calculate FHD histograms and LAI profiles\n\
+-rhoVrhoG x;      ratio of canopy to ground reflectance at this wavelength for rescaling waveform. Note different from rhoV and rhoG\n\
 \nAdding noise:\n\
 -dcBias n;        mean noise level\n\
 -nSig sig;        noise sigma\n\
@@ -2144,7 +2151,6 @@ void writeHelp()
 -nPhotons n;      mean number of photons\n\
 -photonWind x;    twice window length for photon counting search, metres (2 way distance)\n\
 -noiseMult x;     noise multiplier for photon-counting. Noise photon rate in micro Hz\n\
--rhoVrhoG x;      ratio of canopy to ground reflectance at this wavelength. Not different from rhoV and rhoG\n\
 -nPhotC n;        mean number of canopy photons (replaces nPhotons and rhoVrhoG)\n\
 -nPhotG n;        mean number of ground photons (replaces nPhotons and rhoVrhoG)\n\
 -photHDF;         write photon-counting output in HDF5\n");
@@ -2175,8 +2181,8 @@ void writeHelp()
 -medNoise;        use median stats rather than mean\n\
 -varDrift;        correct detector drift with variable factor\n\
 -driftFac xi;     fix drift with constant drift factor\n\
--rhoG rho;        ground reflectance\n\
--rhoC rho;        canopy reflectance\n\
+-rhoG rho;        ground reflectance for calculating true canopy cover\n\
+-rhoC rho;        canopy reflectance for calculating true canopy cover\n\
 -pSigma sig;      pulse width to smooth by if using Gaussian pulse\n\
 -gold;            deconvolve with Gold's method\n\
 -deconTol tol;    deconvolution tolerance\n\
