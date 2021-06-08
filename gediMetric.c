@@ -470,11 +470,12 @@ void determineTruth(dataStruct *data,control *dimage)
 
   /*determine ground*/
   /*apply matched filter to remove assymmetry*/
-  matchedGr=matchedFilter(data->ground[data->useType],data->nBins,dimage->gediIO.den,data->res);
 
   /*find the ground*/
   if(!data->demGround){  /*unless it's already been calculalated from the DEM*/
     if(dimage->gediIO.ground){
+      if(dimage->gediIO.pulse)matchedGr=matchedFilter(data->ground[data->useType],data->nBins,dimage->gediIO.den,data->res);
+      else                    matchedGr=data->ground[data->useType];
 
       /*find CofG*/
       totE=0.0;
@@ -484,6 +485,11 @@ void determineTruth(dataStruct *data,control *dimage)
         data->gElev+=(double)matchedGr[i]*data->z[i];
         meanG+=(double)data->ground[data->useType][i]*data->z[i];
       }
+
+      if(matchedGr!=data->ground[data->useType]){
+        TIDY(matchedGr);
+      }
+
       if(totE>0.0){
         data->gElev/=(double)totE;
         meanG/=(double)totE;
