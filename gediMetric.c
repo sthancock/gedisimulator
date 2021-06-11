@@ -122,6 +122,7 @@ typedef struct{
   char readPulse;    /*read pulse from an ASCII file*/
   float laiRes;      /*LAI profile resolution*/
   float maxLAIh;     /*maximum height bin of LAI profile. Put all above this in top bin*/
+  char rhNoGround;   /*do not use ground in RH metrics*/
 
   /*noise parameters*/
   noisePar noise;  /*noise adding structure*/
@@ -833,7 +834,7 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   double inflGround(float *,double *,int);
   double bayesGround(float *,int,control *,metStruct *,double *,dataStruct *);
   float *blankRH(float,int *);
-  float *smoothed=NULL,*canWave=NULL;
+  float *smoothed=NULL,*canProf=NULL,*canWave=NULL;
   float halfCover(float *,double *,int,double,float);
   void findSignalBounds(float *,double *,int,double *,double *,control *);
   void findWaveExtents(float *,double *,int,double,double,float *,float *);
@@ -880,6 +881,12 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   den.noiseTrack=0;
   smoothed=processFloWave(denoised,nBins,&den,1.0);
 
+  /*true canopy if needed*/
+  if((dimage->noCanopy==0)||(dimage->rhNoGround)){
+    /*from ground removed canopy*/
+  }
+
+
   /*ground by Gaussian fit*/
   if((dimage->noRHgauss==0)&&(nGauss>0))metric->gHeight=gaussianGround(energy,mu,sig,&gInd,nGauss,tot,&metric->gSlope,data,dimage->gediIO.den);
   else                    metric->gHeight=metric->gSlope=-1.0;
@@ -905,8 +912,14 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
 
   /*rh metrics with real ground, if we have the ground*/
   if(dimage->gediIO.ground||data->demGround){
-    if(dimage->noise.linkNoise)metric->rhReal=findRH(data->wave[data->useType],z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*original was noiseless*/
-    else                 metric->rhReal=findRH(denoised,z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*origina was noisy*/
+    if(!dimage->rhNoGround){
+      if(dimage->noise.linkNoise)metric->rhReal=findRH(data->wave[data->useType],z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*original was noiseless*/
+      else                       metric->rhReal=findRH(denoised,z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*origina was noisy*/
+    }else{
+      canWave=subtractGroundFromCan(data->wave[data->useType],data->ground[data->useType],nBins);
+      metric->rhReal=findRH(canWave,z,nBins,data->gElev,dimage->rhRes,&metric->nRH);   /*canopy only*/
+      TIDY(canWave);
+    }
   }else{
     metric->rhReal=falloc((uint64_t)metric->nRH,"rhReal",0);
     for(i=0;i<metric->nRH;i++)metric->rhReal[i]=-1.0;
@@ -915,18 +928,17 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   /*foliage height diversity*/
   metric->FHD=foliageHeightDiversity(denoised,nBins);
   if(dimage->noCanopy==0){   /*more complex ones only if needed*/
+    if(dimage->gediIO.ground)canProf=canProfile(data->wave[data->useType],data->ground[data->useType],nBins);
+    else                     canProf=NULL;  /*no ground estimate. Leave blank*/
     metric->FHDhist=foliageHeightDiversityHist(denoised,nBins,dimage->fhdHistRes);
-    /*from ground removed canopy*/
-    if(dimage->gediIO.ground)canWave=subtractGroundFromCan(data->wave[data->useType],data->ground[data->useType],nBins);
-    else                     canWave=NULL;  /*no ground estimate. Leave blank*/
-    metric->FHDcanH=foliageHeightDiversityHist(canWave,nBins,dimage->fhdHistRes);
-    TIDY(canWave);
+    metric->FHDcanH=foliageHeightDiversityHist(canProf,nBins,dimage->fhdHistRes);
+    TIDY(canProf);
     /*from Gaussian removed canopy*/
-    if(nGauss>0)canWave=subtractGaussFromCan(denoised,nBins,mu[gInd],A[gInd],sig[gInd],z);
-    else        canWave=NULL;  /*no Gaussian ground estimate*/
-    metric->FHDcanGauss=foliageHeightDiversity(canWave,nBins);
-    metric->FHDcanGhist=foliageHeightDiversityHist(canWave,nBins,dimage->fhdHistRes);
-    TIDY(canWave);
+    if(nGauss>0)canProf=subtractGaussFromCan(denoised,nBins,mu[gInd],A[gInd],sig[gInd],z);
+    else        canProf=NULL;  /*no Gaussian ground estimate*/
+    metric->FHDcanGauss=foliageHeightDiversity(canProf,nBins);
+    metric->FHDcanGhist=foliageHeightDiversityHist(canProf,nBins,dimage->fhdHistRes);
+    TIDY(canProf);
   }
 
   /*lai profiles*/
@@ -1753,6 +1765,7 @@ control *readCommands(int argc,char **argv)
   dimage->useBounds=0;        /*process all data provided*/
   dimage->writeGauss=0;       /*do not write Gaussian parameters*/
   dimage->readPulse=0;        /*don't read a pulse*/
+  dimage->rhNoGround=0;       /*do include the ground in RH metrics*/
 
   /*set default denoising parameters*/
   setDenoiseDefault(dimage->gediIO.den);
@@ -2037,6 +2050,8 @@ control *readCommands(int argc,char **argv)
         setBeamsToRead(&(dimage->gediIO.useBeam[0]),argv[++i]);
       }else if(!strncasecmp(argv[i],"-noCanopy",9)){
         dimage->noCanopy=1;
+      }else if(!strncasecmp(argv[i],"-noGroundRH",11)){
+        dimage->rhNoGround=1;
       #ifdef USEPHOTON
       }else if(!strncasecmp(argv[i],"-photonCount",12)){
         dimage->ice2=1;
@@ -2132,6 +2147,7 @@ void writeHelp()
 -dontTrustGround; don't trust ground in waveforms, if included\n\
 -noRoundCoord;    do not round up coords when outputting\n\
 -noCanopy;        do not calculate FHD histograms and LAI profiles\n\
+-noGroundRH;      do not include ground energy in RH metric calculation\n\
 -rhoVrhoG x;      ratio of canopy to ground reflectance at this wavelength for rescaling waveform. Note different from rhoV and rhoG\n\
 \nAdding noise:\n\
 -dcBias n;        mean noise level\n\
