@@ -92,6 +92,29 @@ typedef struct{
 
 
 /*####################################*/
+/*structure to hold SNR*/
+
+typedef struct{
+  int nWaves;
+  /*false rates*/
+  float falsePosRate;
+  float falseNegRate;
+  /*smoothing widths*/
+  int nSig;
+  float minSig;
+  float maxSig;
+  float dSig;
+  /*min widths*/
+  int nMinWid;
+  int minWid;
+  int maxWid;
+  int dWid;
+  /*array of SNRs*/
+  float ***snr;
+}snrStruct;
+
+
+/*####################################*/
 /*control structure*/
 
 typedef struct{
@@ -123,6 +146,7 @@ typedef struct{
   float laiRes;      /*LAI profile resolution*/
   float maxLAIh;     /*maximum height bin of LAI profile. Put all above this in top bin*/
   char rhNoGround;   /*do not use ground in RH metrics*/
+  char onlySNR;      /*only calculate the SNR*/
 
   /*noise parameters*/
   noisePar noise;  /*noise adding structure*/
@@ -143,6 +167,9 @@ typedef struct{
   /*photon counting*/
   char ice2;         /*ICESat-2 mode. GEDI by default*/
   photonStruct photonCount;  /*photon counting structure*/
+
+  /*SNR structure*/
+  snrStruct *snr;      /*structure to hold SNR*/
 
   /*others*/
   float rhoRatio;      /*ratio of canopy to ground reflectance, used only for true canopy cover*/
@@ -233,6 +260,8 @@ int main(int argc,char **argv)
   void modifyTruth(dataStruct *,noisePar *);
   void checkWaveformBounds(dataStruct *,control *);
   void photonCountCloud(float *,dataStruct *,photonStruct *,char *,int,denPar *,noisePar *);
+  void calculateSNR(control *,dataStruct *,int);
+  void tidySNR(control *);
   float *processed=NULL,*denoised=NULL,*pclWave=NULL;
 
   /*read command Line*/
@@ -291,40 +320,45 @@ int main(int argc,char **argv)
       pclWave=NULL;
 
 
-      /*is there any energy*/
-      if(checkUsable(data->noised,data->nBins)){
-        /*process waveform*/
-        /*denoise, or*if we are doing PCL on photon counting, convert to photon count*/
-        denoised=processFloWave(data->noised,data->nBins,dimage->gediIO.den,1.0);
-      }else denoised=NULL;
+      /*do we process or just measure SNR?*/
+      if(!dimage->onlySNR){
+        /*is there any energy*/
+        if(checkUsable(data->noised,data->nBins)){
+          /*process waveform*/
+          /*denoise, or*if we are doing PCL on photon counting, convert to photon count*/
+          denoised=processFloWave(data->noised,data->nBins,dimage->gediIO.den,1.0);
+        }else denoised=NULL;
 
-      /*check that the wave is still usable*/
-      if(denoised&&checkUsable(denoised,data->nBins)){
-        /*are we in GEDI mode?*/
-        if(!dimage->ice2){
+        /*check that the wave is still usable*/
+        if(denoised&&checkUsable(denoised,data->nBins)){
+          /*are we in GEDI mode?*/
+          if(!dimage->ice2){
 
-          /*Gaussian fit*/
-          if(dimage->noRHgauss==0)processed=processFloWave(denoised,data->nBins,dimage->gediIO.gFit,1.0);
-
-
-          /*shift Gaussian centres to align to absolute elevation*/
-          alignElevation(data->z[0],data->z[data->nBins-1],dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss);
+            /*Gaussian fit*/
+            if(dimage->noRHgauss==0)processed=processFloWave(denoised,data->nBins,dimage->gediIO.gFit,1.0);
 
 
-          /*determine metrics*/
-          findMetrics(metric,dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss,denoised,data->noised,data->nBins,data->z,dimage,data);
+            /*shift Gaussian centres to align to absolute elevation*/
+            alignElevation(data->z[0],data->z[data->nBins-1],dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss);
 
 
-          /*write results*/
-          if(dimage->readBinLVIS||dimage->readHDFlvis||dimage->readHDFgedi)writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[0]);
-          else                                                             writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[i]);
+            /*determine metrics*/
+            findMetrics(metric,dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss,denoised,data->noised,data->nBins,data->z,dimage,data);
 
-        }else{  /*ICESat-2 mode*/
-          photonCountCloud(denoised,data,&dimage->photonCount,dimage->outRoot,i,dimage->gediIO.den,&dimage->noise);
-        }/*operation mode switch*/
-      }else{/*still usable after denoising?*/
-        fprintf(stderr,"No longer usable\n");
-      }
+
+            /*write results*/
+            if(dimage->readBinLVIS||dimage->readHDFlvis||dimage->readHDFgedi)writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[0]);
+            else                                                             writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[i]);
+
+          }else{  /*ICESat-2 mode*/
+            photonCountCloud(denoised,data,&dimage->photonCount,dimage->outRoot,i,dimage->gediIO.den,&dimage->noise);
+          }/*operation mode switch*/
+        }else{/*still usable after denoising?*/
+          fprintf(stderr,"No longer usable\n");
+        }/*data useable check*/
+      }else{ /*otherwise calculate SNR*/
+        calculateSNR(dimage,data,i);
+      }/*metrics or SNR if*/
     }/*is the data usable*/
 
     /*tidy as we go along*/
@@ -377,6 +411,7 @@ int main(int argc,char **argv)
   tidySMoothPulse();
   TIDY(metric);
   if(dimage){
+    if(dimage->snr)tidySNR(dimage);
     if(dimage->lvisL2){
       TIDY(dimage->lvisL2->lfid);
       TIDY(dimage->lvisL2->shotN);
@@ -427,6 +462,108 @@ int main(int argc,char **argv)
   }
   return(0);
 }/*main*/
+
+
+/*####################################################*/
+/*calculate SNR*/
+
+void calculateSNR(control *dimage,dataStruct *data,int numb)
+{
+  int i=0,j=0;
+  void allocateSNR(control *);
+
+  /*allocate if needed*/
+  if(dimage->snr==NULL)allocateSNR(dimage);
+
+
+  /*loop over smoothing widths*/
+  for(j=0;j<dimage->snr->nSig;j++){
+    /*smooth waveform*/
+
+    /*find ground properties*/
+
+    /*loop over minimum widths*/
+    for(i=0;i<dimage->snr->nMinWid;i++){
+      /*find statistics for a given width*/
+
+    }
+  }
+
+
+  return;
+}/*calculateSNR*/
+
+
+/*####################################################*/
+/*free SNR structure*/
+
+void tidySNR(control *dimage)
+{
+  int i=0,j=0;
+
+  if(dimage->snr->snr){
+    for(i=0;i<dimage->snr->nMinWid;i++){
+      for(j=0;j<dimage->snr->nSig;j++){
+        TIDY(dimage->snr->snr[i][j]);
+      }
+      TIDY(dimage->snr->snr[i]);
+    }
+    TIDY(dimage->snr->snr);
+  }
+
+  TIDY(dimage->snr);
+
+  return;
+}/*tidySNR*/
+
+
+/*####################################################*/
+/*allocate SNR structure*/
+
+void allocateSNR(control *dimage)
+{
+  int i=0,j=0;
+
+  if(!(dimage->snr=(snrStruct *)calloc(1,sizeof(snrStruct)))){
+    fprintf(stderr,"error in snrStruct allocation.\n");
+    exit(1);
+  }
+
+  /*false rates*/
+  dimage->snr->falsePosRate=0.05;
+  dimage->snr->falseNegRate=0.1;
+
+
+  /*smoothing widths*/
+  dimage->snr->minSig=0.0;
+  dimage->snr->maxSig=2.0;
+  dimage->snr->dSig=0.25;
+  dimage->snr->nSig=(int)((dimage->snr->maxSig-dimage->snr->minSig)/dimage->snr->dSig+1.0);
+
+  /*min widths*/
+  dimage->snr->minWid=1;
+  dimage->snr->maxWid=9;
+  dimage->snr->dWid=2;
+  dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid;
+
+  /*waveforms*/
+  dimage->snr->nWaves=dimage->gediIO.nFiles;
+
+  /*allocate SNRs*/
+  if(!(dimage->snr->snr=(float ***)calloc(dimage->snr->nMinWid,sizeof(float **)))){
+    fprintf(stderr,"error in snr allocation.\n");
+    exit(1);
+  }
+
+  for(i=0;i<dimage->snr->nMinWid;i++){
+    dimage->snr->snr[i]=fFalloc(dimage->snr->nSig,"snr",i+1);
+    for(j=0;j<dimage->snr->nSig;j++){
+      dimage->snr->snr[i][j]=falloc(dimage->snr->nWaves,"",j+1);
+    }
+  }
+
+  return;
+}/*allocateSNR*/
 
 
 /*####################################################*/
@@ -1766,6 +1903,8 @@ control *readCommands(int argc,char **argv)
   dimage->writeGauss=0;       /*do not write Gaussian parameters*/
   dimage->readPulse=0;        /*don't read a pulse*/
   dimage->rhNoGround=0;       /*do include the ground in RH metrics*/
+  dimage->onlySNR=0;          /*don't just measure SNR*/
+  dimage->snr=NULL;
 
   /*set default denoising parameters*/
   setDenoiseDefault(dimage->gediIO.den);
@@ -1991,6 +2130,8 @@ control *readCommands(int argc,char **argv)
         dimage->gTol=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-noRHgauss",10)){
         dimage->noRHgauss=1;
+      }else if(!strncasecmp(argv[i],"-onlySNR",8)){
+        dimage->onlySNR=1;
       }else if(!strncasecmp(argv[i],"-renoise",8)){
        dimage->renoiseWave=1;
       }else if(!strncasecmp(argv[i],"-newPsig",8)){
@@ -2140,6 +2281,7 @@ void writeHelp()
 -laiRes res;      lai profile resolution in metres\n\
 -laiH h;          height to calculate LAI to\n\
 -noRHgauss;       do not fit Gaussians\n\
+-onlySNR;         only calculate the SNR, no metrics\n\
 -gTol tol;        ALS ground tolerance. Used to calculate slope.\n\
 -fhdHistRes res;  waveform intensity resolution to use when calculating FHD from histograms\n\
 -forcePsigma;     do not read pulse sigma from file\n\
