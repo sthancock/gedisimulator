@@ -469,7 +469,9 @@ int main(int argc,char **argv)
 
 void calculateSNR(control *dimage,dataStruct *data,int numb)
 {
-  int i=0,j=0;
+  int i=0,j=0,minWidth=0;
+  float sWidth=0,gWidth=0;
+  float *smoothed=NULL;
   void allocateSNR(control *);
 
   /*allocate if needed*/
@@ -478,12 +480,21 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
   /*loop over smoothing widths*/
   for(j=0;j<dimage->snr->nSig;j++){
+    sWidth=(float)j*dimage->snr->dSig+dimage->snr->minSig;
+
     /*smooth waveform*/
+    smoothed=smooth(sWidth,data->nBins,data->noised,data->res);
 
     /*find ground properties*/
+    gWidth=sqrt(data->gStdev*data->gStdev+sWidth*sWidth);
+
+    /*find mean noise*/
+    //meanNoise=
 
     /*loop over minimum widths*/
     for(i=0;i<dimage->snr->nMinWid;i++){
+      minWidth=i*dimage->snr->dWid+dimage->snr->minWid;
+
       /*find statistics for a given width*/
 
     }
