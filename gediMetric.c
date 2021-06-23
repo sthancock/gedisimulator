@@ -620,7 +620,7 @@ float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins
   float linkM=0,maxGr=0;
   float totN=0.0,totE=0.0;
 
-  /*find peak ground*/
+  /*find peak ground and total energies for scaling*/
   maxGr=-1000.0;
   for(i=0;i<nBins;i++){
     if(smooGr[i]>maxGr)maxGr=smooGr[i];
@@ -732,7 +732,6 @@ void populateSNRhist(float *wave,int sBin,int eBin,float *noiseHist,float *minHi
   int i=0,j=0,l=0;
   int totLen=0;
   float thresh=0;
-static int c=0;
 
   /*loop over noise levels*/
   for(j=0;j<*histBins;j++){
@@ -754,8 +753,6 @@ static int c=0;
     /*add to histogram*/
     noiseHist[j]+=(float)totLen/((float)(eBin-sBin)*2.0);  /*multipled 2 as we're doing the start and end*/
   }/*threshold loop*/
-
-c++;
 
   return;
 }/*populateSNRhist*/
@@ -840,14 +837,14 @@ void allocateSNR(control *dimage)
 
 
   /*smoothing widths*/
-  dimage->snr->minSig=0.001;
-  dimage->snr->maxSig=0.001;
+  dimage->snr->minSig=0.1;
+  dimage->snr->maxSig=2.5;
   dimage->snr->dSig=0.25;
   dimage->snr->nSig=(int)((dimage->snr->maxSig-dimage->snr->minSig)/dimage->snr->dSig+1.0);
 
   /*min widths*/
   dimage->snr->minWid=1;
-  dimage->snr->maxWid=1;
+  dimage->snr->maxWid=9;
   dimage->snr->dWid=2;
   dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid+1;
 
