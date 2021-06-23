@@ -530,7 +530,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   float snrPosThresh(float *,float,float,int,float,float);
   float snrBeamSense(float,float,float *,int,float,float,float *);
   float snrLinkMarginPCL(float,float,float,float,float *,int,float);
-  float snrLinkMargin(float,float *,float,int);
+  float snrLinkMargin(float,float *,float,int,dataStruct *);
   void allocateSNR(control *);
 
   /*allocate if needed*/
@@ -571,13 +571,11 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
       if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
         dimage->snr->linkM[i][j][numb]=snrLinkMarginPCL(falsePosThresh,meanNoise,gWidth,data->cov,data->wave[data->useType],data->nBins,data->res);
       }else{
-        dimage->snr->linkM[i][j][numb]=snrLinkMargin(falsePosThresh,smooGr,meanNoise,data->nBins);
+        dimage->snr->linkM[i][j][numb]=snrLinkMargin(falsePosThresh,smooGr,meanNoise,data->nBins,data);
       }
 
       /*beam sensitivity from ground integral*/
       dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise,data->noised);
-
-//fprintf(stdout,"%f %f %f %f %f %f\n",data->cov,data->gStdev,falsePosThresh,meanNoise,dimage->snr->linkM[i][j][numb],dimage->snr->bSense[i][j][numb]);
 
       TIDY(noiseHist);
     }/*min width loop*/
@@ -616,20 +614,28 @@ float snrLinkMarginPCL(float falsePosThresh,float meanNoise,float gWidth,float c
 /*####################################################*/
 /*find the link margin for SNR*/
 
-float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins)
+float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins,dataStruct *data)
 {
   int i=0;
-  float linkM=0;
-  float maxGr=0;
+  float linkM=0,maxGr=0;
+  float totN=0.0,totE=0.0;
 
   /*find peak ground*/
   maxGr=-1000.0;
   for(i=0;i<nBins;i++){
     if(smooGr[i]>maxGr)maxGr=smooGr[i];
+    totN+=data->noised[i];
+    totE+=data->wave[data->useType][i];
   }
+  totN-=meanNoise*(float)nBins;
+  totN*=data->res;
+  totE*=data->res;
+
+  /*scale to match threshold*/
+  maxGr*=totN/totE;
 
   /*find link margin*/
-  linkM=10.0*log10((maxGr-meanNoise)/(falsePosThresh-meanNoise));
+  linkM=10.0*log10(maxGr/(falsePosThresh-meanNoise));
 
   return(linkM);
 }/*snrLinkMargin*/
