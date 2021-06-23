@@ -110,7 +110,10 @@ typedef struct{
   int maxWid;
   int dWid;
   /*array of SNRs*/
-  float ***snr;
+  float ***linkM;   /*link margin per sWidth, per minWidth, per wave*/
+  float ***bSense;  /*beam sensitivity per sWidth, per minWidth, per wave*/
+  float *cov;       /*canopy cover per wave*/
+  float *gWidth;    /*ground width per wave*/
 }snrStruct;
 
 
@@ -262,6 +265,7 @@ int main(int argc,char **argv)
   void photonCountCloud(float *,dataStruct *,photonStruct *,char *,int,denPar *,noisePar *);
   void calculateSNR(control *,dataStruct *,int);
   void tidySNR(control *);
+  void writeSNR(char *o,snrStruct *);
   float *processed=NULL,*denoised=NULL,*pclWave=NULL;
 
   /*read command Line*/
@@ -395,6 +399,10 @@ int main(int argc,char **argv)
     //TIDY(metric->LmomMax);
   }/*file loop*/
 
+  /*write results if needed*/
+  if(dimage->onlySNR)writeSNR(dimage->outRoot,dimage->snr);
+
+
   /*TIDY LVIS data if it was read*/
   if(dimage->readBinLVIS)TIDY(dimage->lvis.data);
   if(dimage->readHDFgedi)dimage->hdfGedi=tidyGediHDF(dimage->hdfGedi);
@@ -465,18 +473,75 @@ int main(int argc,char **argv)
 
 
 /*####################################################*/
+/*write SNR results*/
+
+void writeSNR(char *outRoot,snrStruct *snr)
+{
+  int i=0,j=0,k=0;
+  int wid=0;
+  float sig=0;
+  char namen[200];
+  FILE *opoo=NULL;
+
+  /*open file*/
+  sprintf(namen,"%s.snr.txt",outRoot);
+  if((opoo=fopen(namen,"w"))==NULL){
+    fprintf(stderr,"Error opening output file %s\n",namen);
+    exit(1);
+  }
+
+  /*write header*/
+  fprintf(opoo,"# 1 cov, 2 gWidth, 3 sWidth, 4 minWidth, 5 linkM, 6 beamSense\n");
+
+  /*loop over waves*/
+  for(k=0;k<snr->nWaves;k++){
+    for(j=0;j<snr->nSig;j++){
+      sig=(float)j*snr->dSig+snr->minSig;
+      for(i=0;i<snr->nMinWid;i++){
+        wid=i*snr->dWid+snr->minWid;
+        fprintf(opoo,"%f %f %f %d %f %f\n",snr->cov[k],snr->gWidth[k],sig,wid,snr->linkM[i][j][k],snr->bSense[i][j][k]);
+      }
+    }
+  }
+
+  /*close up*/
+  if(opoo){
+    fclose(opoo);
+    opoo=NULL;
+  }
+  fprintf(stdout,"Written to %s\n",namen);
+
+  return;
+}/*writeSNR*/
+
+
+/*####################################################*/
 /*calculate SNR*/
 
 void calculateSNR(control *dimage,dataStruct *data,int numb)
 {
   int i=0,j=0,minWidth=0;
+  int eBin=0,sBin=0;
+  int histBins=0;
   float sWidth=0,gWidth=0;
-  float *smoothed=NULL;
+  float *smoothed=NULL,meanNoise=0;
+  float *smooGr=NULL;
+  float falsePosThresh=0;
+  float snrMeanNoise(float *,int,float,int *,int *);
+  float *snrNoiseHist(float *,int,float,int,int,int *,int,float *,float *,float *);
+  float *noiseHist=NULL,minHist=0,maxHist=0,histRes=0;
+  float snrPosThresh(float *,float,float,int,float);
+  float snrBeamSense(float,float,float *,int,float,float);
+  float snrLinkMarginPCL(float,float,float,float,float *,int,float);
+  float snrLinkMargin(float,float *,float,int);
   void allocateSNR(control *);
 
   /*allocate if needed*/
   if(dimage->snr==NULL)allocateSNR(dimage);
 
+  /*save covers and widths*/
+  dimage->snr->cov[numb]=data->cov;
+  dimage->snr->gWidth[numb]=data->gStdev;
 
   /*loop over smoothing widths*/
   for(j=0;j<dimage->snr->nSig;j++){
@@ -484,25 +549,232 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
     /*smooth waveform*/
     smoothed=smooth(sWidth,data->nBins,data->noised,data->res);
+    if(!dimage->gediIO.pclPhoton&&!dimage->gediIO.pcl)smooGr=smooth(sWidth,data->nBins,data->ground[data->useType],data->res);
+
 
     /*find ground properties*/
-    gWidth=sqrt(data->gStdev*data->gStdev+sWidth*sWidth);
+    if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
+      gWidth=sqrt(data->res*data->res*4.0+sWidth*sWidth);
+    }else gWidth=sqrt(data->gStdev*data->gStdev+sWidth*sWidth);  /*else use observed width*/
 
     /*find mean noise*/
-    //meanNoise=
+    meanNoise=snrMeanNoise(smoothed,data->nBins,data->res,&eBin,&sBin);
 
     /*loop over minimum widths*/
     for(i=0;i<dimage->snr->nMinWid;i++){
       minWidth=i*dimage->snr->dWid+dimage->snr->minWid;
 
       /*find statistics for a given width*/
+      noiseHist=snrNoiseHist(smoothed,data->nBins,meanNoise,eBin,sBin,&histBins,minWidth,&minHist,&maxHist,&histRes);
 
-    }
-  }
+      /*find failure prob threshold*/
+      falsePosThresh=snrPosThresh(noiseHist,minHist,histRes,histBins,dimage->snr->falsePosRate);
 
+      /*link margin from ground amplitude*/
+      if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
+        dimage->snr->linkM[i][j][numb]=snrLinkMarginPCL(falsePosThresh,meanNoise,gWidth,data->cov,data->wave[data->useType],data->nBins,data->res);
+      }else{
+        dimage->snr->linkM[i][j][numb]=snrLinkMargin(falsePosThresh,smooGr,meanNoise,data->nBins);
+      }
+
+      /*beam sensitivity from ground integral*/
+      dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise);
+
+      TIDY(noiseHist);
+    }/*min width loop*/
+
+    TIDY(smoothed);
+    TIDY(smooGr);
+  }/*smoothing width loop*/
 
   return;
 }/*calculateSNR*/
+
+
+/*####################################################*/
+/*find the link margin for SNR for PCL*/
+
+float snrLinkMarginPCL(float falsePosThresh,float meanNoise,float gWidth,float cov,float *wave,int nBins,float res)
+{
+  int i=0;
+  float linkM=0;
+  float gAmp=0,totE=0;
+
+  /*find total energy*/
+  totE=0.0;
+  for(i=0;i<nBins;i++)totE+=wave[i];
+  totE-=(float)nBins*meanNoise;
+  totE*=res;
+
+  /*find hypothetical ground amplitude*/
+  gAmp=totE*cov/(gWidth*sqrt(2.0*M_PI));
+  linkM=10.0*log10(gAmp/(falsePosThresh-meanNoise));
+
+  return(linkM);
+}/*snrLinkMarginPCL*/
+
+
+/*####################################################*/
+/*find the link margin for SNR*/
+
+float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins)
+{
+  int i=0;
+  float linkM=0;
+  float maxGr=0;
+
+  /*find peak ground*/
+  maxGr=-1000.0;
+  for(i=0;i<nBins;i++){
+    if(smooGr[i]>maxGr)maxGr=smooGr[i];
+  }
+
+  /*find link margin*/
+  linkM=10.0*log10((maxGr-meanNoise)/(falsePosThresh-meanNoise));
+
+  return(linkM);
+}/*snrLinkMargin*/
+
+
+/*####################################################*/
+/*find beam sensitivity for SNR*/
+
+float snrBeamSense(float falsePosThresh,float gWidth,float *wave,int nBins,float res,float meanNoise)
+{
+  int i=0;
+  float totE=0.0,gInt=0;
+  float bSense=0;
+
+  /*find integral*/
+  for(i=0;i<nBins;i++)totE+=wave[i];
+  totE-=(float)nBins*meanNoise;
+  totE*=res;
+
+  /*integral for threshold*/
+  gInt=(falsePosThresh-meanNoise)*gWidth*sqrt(2.0*M_PI);
+  bSense=gInt/totE;  
+
+  return(bSense);
+}/*snrBeamSense*/
+
+
+/*####################################################*/
+/*find failure prob threshold*/
+
+float snrPosThresh(float *noiseHist,float minHist,float histRes,int histBins,float falsePosRate)
+{
+  int i=0;
+  float max=0;
+  float falsePosThresh=0;
+
+  /*find maximum*/
+  max=-1000.0;
+  for(i=0;i<histBins;i++){
+    if(noiseHist[i]>max)max=noiseHist[i];
+  }
+
+  /*find the threshold*/
+  for(i=0;i<histBins;i++){
+    if((noiseHist[i]/max)>(1.0-falsePosRate)){
+      falsePosThresh=(float)i*histRes+minHist;
+      break;
+    }
+  }
+
+  return(falsePosThresh);
+}/*snrPosThresh*/
+
+
+/*####################################################*/
+/*find noise histogram for given minWidth*/
+
+float *snrNoiseHist(float *smoothed,int nBins,float meanNoise,int eBin,int sBin,int *histBins,int minWidth,float *minHist,float *maxHist,float *histRes)
+{
+  int i=0;
+  float *noiseHist=NULL;
+  void populateSNRhist(float *,int,int,float *,float *,float *,int *,int,float *);
+
+  /*find min/max*/
+  *minHist=100000.0;
+  *maxHist=-100000;
+  for(i=0;i<sBin;i++){
+    if(smoothed[i]<*minHist)*minHist=smoothed[i];
+    if(smoothed[i]>*maxHist)*maxHist=smoothed[i];
+  }
+  for(i=eBin;i<nBins;i++){
+    if(smoothed[i]<*minHist)*minHist=smoothed[i];
+    if(smoothed[i]>*maxHist)*maxHist=smoothed[i];
+  }
+
+  /*allocate histogram*/
+  *histRes=(*maxHist-*minHist)/1000.0;
+  *histBins=(int)((*maxHist-*minHist)/(*histRes)+1.0);
+  noiseHist=falloc(*histBins,"noiseHist",0);
+
+  /*populate histogram*/
+  populateSNRhist(smoothed,0,sBin,noiseHist,minHist,maxHist,histBins,minWidth,histRes);
+  populateSNRhist(smoothed,eBin,nBins,noiseHist,minHist,maxHist,histBins,minWidth,histRes);
+
+  return(noiseHist);
+}/*snrNoiseHist*/
+
+
+/*####################################################*/
+/*populate histogram*/
+
+void populateSNRhist(float *wave,int sBin,int eBin,float *noiseHist,float *minHist,float *maxHist,int *histBins,int minWidth,float *histRes)
+{
+  int i=0,j=0,l=0;
+  int totLen=0;
+  float thresh=0;
+
+  /*loop over noise levels*/
+  for(j=0;j<*histBins;j++){
+    thresh=*minHist+(float)j*(*histRes);
+
+    l=totLen=0;
+    for(i=sBin;i<eBin;i++){
+
+      if(wave[i]>=thresh)l++;
+      else if((wave[i]<thresh)&&(l>0)){
+        if(l>=minWidth)totLen+=l;
+        l=0;
+      }
+
+    }/*bin loop */
+
+    noiseHist[j]+=(float)totLen/((float)(eBin-sBin)*2.0);  /*multipled 2 as we're doing the start and end*/
+  }/*threshold loop*/
+
+  return;
+}/*populateSNRhist*/
+
+
+/*####################################################*/
+/*find background noise for SNR calculation*/
+
+float snrMeanNoise(float *smoothed,int nBins,float res,int *sBin,int *eBin)
+{
+  int i=0;
+  float meanNoise=0.0;
+  float buff=0;
+
+  *sBin=*eBin=-1;
+
+  /*buffer from start and end for signal to noise*/
+  buff=15.0;
+  *sBin=(int)(buff/res);
+  *eBin=nBins-(int)(buff/res);
+
+  /*find mean*/
+  for(i=0;i<*sBin;i++)meanNoise+=smoothed[i];
+  for(i=*eBin;i<nBins;i++)meanNoise+=smoothed[i];
+
+  /*normalise*/
+  if((*eBin+*sBin)>0)meanNoise/=(float)(*eBin+*sBin);
+
+  return(meanNoise);
+}/*snrMeanNoise*/
 
 
 /*####################################################*/
@@ -512,15 +784,26 @@ void tidySNR(control *dimage)
 {
   int i=0,j=0;
 
-  if(dimage->snr->snr){
+  if(dimage->snr->linkM){
     for(i=0;i<dimage->snr->nMinWid;i++){
       for(j=0;j<dimage->snr->nSig;j++){
-        TIDY(dimage->snr->snr[i][j]);
+        TIDY(dimage->snr->linkM[i][j]);
       }
-      TIDY(dimage->snr->snr[i]);
+      TIDY(dimage->snr->linkM[i]);
     }
-    TIDY(dimage->snr->snr);
+    TIDY(dimage->snr->linkM);
   }
+  if(dimage->snr->bSense){
+    for(i=0;i<dimage->snr->nMinWid;i++){
+      for(j=0;j<dimage->snr->nSig;j++){
+        TIDY(dimage->snr->bSense[i][j]);
+      }
+      TIDY(dimage->snr->bSense[i]);
+    }
+    TIDY(dimage->snr->bSense);
+  }
+  TIDY(dimage->snr->cov);
+  TIDY(dimage->snr->gWidth);
 
   TIDY(dimage->snr);
 
@@ -561,17 +844,27 @@ void allocateSNR(control *dimage)
   dimage->snr->nWaves=dimage->gediIO.nFiles;
 
   /*allocate SNRs*/
-  if(!(dimage->snr->snr=(float ***)calloc(dimage->snr->nMinWid,sizeof(float **)))){
-    fprintf(stderr,"error in snr allocation.\n");
+  if(!(dimage->snr->linkM=(float ***)calloc(dimage->snr->nMinWid,sizeof(float **)))){
+    fprintf(stderr,"error in snr linkM allocation.\n");
+    exit(1);
+  }
+  if(!(dimage->snr->bSense=(float ***)calloc(dimage->snr->nMinWid,sizeof(float **)))){
+    fprintf(stderr,"error in snr bSense allocation.\n");
     exit(1);
   }
 
   for(i=0;i<dimage->snr->nMinWid;i++){
-    dimage->snr->snr[i]=fFalloc(dimage->snr->nSig,"snr",i+1);
+    dimage->snr->linkM[i]=fFalloc(dimage->snr->nSig,"snr linkM",i+1);
+    dimage->snr->bSense[i]=fFalloc(dimage->snr->nSig,"snr bSense",i+1);
+
     for(j=0;j<dimage->snr->nSig;j++){
-      dimage->snr->snr[i][j]=falloc(dimage->snr->nWaves,"",j+1);
+      dimage->snr->linkM[i][j]=falloc(dimage->snr->nWaves,"snr linkM",j+1);
+      dimage->snr->bSense[i][j]=falloc(dimage->snr->nWaves,"snr bSense",j+1);
     }
   }
+
+  dimage->snr->cov=falloc(dimage->snr->nWaves,"snr cov",0);
+  dimage->snr->gWidth=falloc(dimage->snr->nWaves,"snr gWidth",0);
 
   return;
 }/*allocateSNR*/
