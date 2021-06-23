@@ -713,7 +713,9 @@ float *snrNoiseHist(float *smoothed,int nBins,float meanNoise,int eBin,int sBin,
 
   /*allocate histogram*/
   *histRes=(*maxHist-*minHist)/pow(2.0,12.0);
+  if(*histRes<=0.0)*histRes=TOL;
   *histBins=(int)((*maxHist-*minHist)/(*histRes)+1.0);
+  if(*histBins<=0)*histBins=1;
   noiseHist=falloc(*histBins,"noiseHist",0);
 
   /*populate histogram*/
