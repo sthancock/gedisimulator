@@ -399,17 +399,14 @@ int main(int argc,char **argv)
     //TIDY(metric->LmomMax);
   }/*file loop*/
 
-  /*write results if needed*/
-  if(dimage->onlySNR)writeSNR(dimage->outRoot,dimage->snr);
-
-
   /*TIDY LVIS data if it was read*/
   if(dimage->readBinLVIS)TIDY(dimage->lvis.data);
   if(dimage->readHDFgedi)dimage->hdfGedi=tidyGediHDF(dimage->hdfGedi);
 
-
+  /*write results if needed*/
   if(dimage->writeGauss)fprintf(stdout,"Written to %s.gauss.txt\n",dimage->outRoot);
-  if(!dimage->ice2)fprintf(stdout,"Written to %s.metric.txt\n",dimage->outRoot);
+  if(!dimage->ice2&&!dimage->onlySNR)fprintf(stdout,"Written to %s.metric.txt\n",dimage->outRoot);
+  if(dimage->onlySNR)writeSNR(dimage->outRoot,dimage->snr);
   #ifdef USEPHOTON
   else             fprintf(stdout,"Written to %s\n",dimage->photonCount.outNamen);
   #endif
@@ -528,10 +525,10 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   float *smooGr=NULL;
   float falsePosThresh=0;
   float snrMeanNoise(float *,int,float,int *,int *);
-  float *snrNoiseHist(float *,int,float,int,int,int *,int,float *,float *,float *);
+  float *snrNoiseHist(float *,int,float,int,int,int *,int,float *,float *,float *,dataStruct *);
   float *noiseHist=NULL,minHist=0,maxHist=0,histRes=0;
-  float snrPosThresh(float *,float,float,int,float);
-  float snrBeamSense(float,float,float *,int,float,float);
+  float snrPosThresh(float *,float,float,int,float,float);
+  float snrBeamSense(float,float,float *,int,float,float,float *);
   float snrLinkMarginPCL(float,float,float,float,float *,int,float);
   float snrLinkMargin(float,float *,float,int);
   void allocateSNR(control *);
@@ -558,17 +555,17 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
     }else gWidth=sqrt(data->gStdev*data->gStdev+sWidth*sWidth);  /*else use observed width*/
 
     /*find mean noise*/
-    meanNoise=snrMeanNoise(smoothed,data->nBins,data->res,&eBin,&sBin);
+    meanNoise=snrMeanNoise(smoothed,data->nBins,data->res,&sBin,&eBin);
 
     /*loop over minimum widths*/
     for(i=0;i<dimage->snr->nMinWid;i++){
       minWidth=i*dimage->snr->dWid+dimage->snr->minWid;
 
       /*find statistics for a given width*/
-      noiseHist=snrNoiseHist(smoothed,data->nBins,meanNoise,eBin,sBin,&histBins,minWidth,&minHist,&maxHist,&histRes);
+      noiseHist=snrNoiseHist(smoothed,data->nBins,meanNoise,eBin,sBin,&histBins,minWidth,&minHist,&maxHist,&histRes,data);
 
       /*find failure prob threshold*/
-      falsePosThresh=snrPosThresh(noiseHist,minHist,histRes,histBins,dimage->snr->falsePosRate);
+      falsePosThresh=snrPosThresh(noiseHist,minHist,histRes,histBins,dimage->snr->falsePosRate,data->res);
 
       /*link margin from ground amplitude*/
       if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
@@ -578,7 +575,9 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
       }
 
       /*beam sensitivity from ground integral*/
-      dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise);
+      dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise,data->noised);
+
+//fprintf(stdout,"%f %f %f %f %f %f\n",data->cov,data->gStdev,falsePosThresh,meanNoise,dimage->snr->linkM[i][j][numb],dimage->snr->bSense[i][j][numb]);
 
       TIDY(noiseHist);
     }/*min width loop*/
@@ -639,20 +638,20 @@ float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins
 /*####################################################*/
 /*find beam sensitivity for SNR*/
 
-float snrBeamSense(float falsePosThresh,float gWidth,float *wave,int nBins,float res,float meanNoise)
+float snrBeamSense(float falsePosThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised)
 {
   int i=0;
-  float totE=0.0,gInt=0;
+  float gInt=0,totN=0.0;
   float bSense=0;
 
   /*find integral*/
-  for(i=0;i<nBins;i++)totE+=wave[i];
-  totE-=(float)nBins*meanNoise;
-  totE*=res;
+  for(i=0;i<nBins;i++)totN+=noised[i];
+  totN-=(float)nBins*meanNoise;
+  totN*=res;
 
   /*integral for threshold*/
   gInt=(falsePosThresh-meanNoise)*gWidth*sqrt(2.0*M_PI);
-  bSense=gInt/totE;  
+  bSense=1.0-gInt/totN;  
 
   return(bSense);
 }/*snrBeamSense*/
@@ -661,7 +660,7 @@ float snrBeamSense(float falsePosThresh,float gWidth,float *wave,int nBins,float
 /*####################################################*/
 /*find failure prob threshold*/
 
-float snrPosThresh(float *noiseHist,float minHist,float histRes,int histBins,float falsePosRate)
+float snrPosThresh(float *noiseHist,float minHist,float histRes,int histBins,float falsePosRate,float res)
 {
   int i=0;
   float max=0;
@@ -674,8 +673,8 @@ float snrPosThresh(float *noiseHist,float minHist,float histRes,int histBins,flo
   }
 
   /*find the threshold*/
-  for(i=0;i<histBins;i++){
-    if((noiseHist[i]/max)>(1.0-falsePosRate)){
+  for(i=histBins-1;i>=0;i--){
+    if(((30.0/res)*noiseHist[i]/max)>=falsePosRate){
       falsePosThresh=(float)i*histRes+minHist;
       break;
     }
@@ -688,7 +687,7 @@ float snrPosThresh(float *noiseHist,float minHist,float histRes,int histBins,flo
 /*####################################################*/
 /*find noise histogram for given minWidth*/
 
-float *snrNoiseHist(float *smoothed,int nBins,float meanNoise,int eBin,int sBin,int *histBins,int minWidth,float *minHist,float *maxHist,float *histRes)
+float *snrNoiseHist(float *smoothed,int nBins,float meanNoise,int eBin,int sBin,int *histBins,int minWidth,float *minHist,float *maxHist,float *histRes,dataStruct *data)
 {
   int i=0;
   float *noiseHist=NULL;
@@ -707,7 +706,7 @@ float *snrNoiseHist(float *smoothed,int nBins,float meanNoise,int eBin,int sBin,
   }
 
   /*allocate histogram*/
-  *histRes=(*maxHist-*minHist)/1000.0;
+  *histRes=(*maxHist-*minHist)/pow(2.0,12.0);
   *histBins=(int)((*maxHist-*minHist)/(*histRes)+1.0);
   noiseHist=falloc(*histBins,"noiseHist",0);
 
@@ -727,6 +726,7 @@ void populateSNRhist(float *wave,int sBin,int eBin,float *noiseHist,float *minHi
   int i=0,j=0,l=0;
   int totLen=0;
   float thresh=0;
+static int c=0;
 
   /*loop over noise levels*/
   for(j=0;j<*histBins;j++){
@@ -740,11 +740,16 @@ void populateSNRhist(float *wave,int sBin,int eBin,float *noiseHist,float *minHi
         if(l>=minWidth)totLen+=l;
         l=0;
       }
-
     }/*bin loop */
 
+    /*in case we're still in a feature*/
+    if(l>=minWidth)totLen+=l;
+
+    /*add to histogram*/
     noiseHist[j]+=(float)totLen/((float)(eBin-sBin)*2.0);  /*multipled 2 as we're doing the start and end*/
   }/*threshold loop*/
+
+c++;
 
   return;
 }/*populateSNRhist*/
@@ -771,7 +776,7 @@ float snrMeanNoise(float *smoothed,int nBins,float res,int *sBin,int *eBin)
   for(i=*eBin;i<nBins;i++)meanNoise+=smoothed[i];
 
   /*normalise*/
-  if((*eBin+*sBin)>0)meanNoise/=(float)(*eBin+*sBin);
+  if((*eBin+*sBin)>0)meanNoise/=(float)((*sBin)+(nBins-(*eBin)));
 
   return(meanNoise);
 }/*snrMeanNoise*/
@@ -829,16 +834,16 @@ void allocateSNR(control *dimage)
 
 
   /*smoothing widths*/
-  dimage->snr->minSig=0.0;
-  dimage->snr->maxSig=2.0;
+  dimage->snr->minSig=0.001;
+  dimage->snr->maxSig=0.001;
   dimage->snr->dSig=0.25;
   dimage->snr->nSig=(int)((dimage->snr->maxSig-dimage->snr->minSig)/dimage->snr->dSig+1.0);
 
   /*min widths*/
   dimage->snr->minWid=1;
-  dimage->snr->maxWid=9;
+  dimage->snr->maxWid=1;
   dimage->snr->dWid=2;
-  dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid;
+  dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid+1;
 
   /*waveforms*/
   dimage->snr->nWaves=dimage->gediIO.nFiles;
