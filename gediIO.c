@@ -4533,13 +4533,19 @@ float waveformTrueCover(dataStruct *data,gediIOstruct *gediIO,float rhoRatio)
   int i=0;
   float totC=0,totG=0;
   float cov=0;
+  float minG=0,minC=0;
 
   if(gediIO->ground){
     totG=totC=0.0;
+    minG=minC=100000.0;
     for(i=0;i<data->nBins;i++){
      totG+=data->ground[data->useType][i];
      totC+=data->wave[data->useType][i]-data->ground[data->useType][i];
+     if(data->ground[data->useType][i]<minG)minG=data->ground[data->useType][i];
+     if(data->wave[data->useType][i]<minC)minC=data->wave[data->useType][i];
     }
+    totC-=minC*(float)data->nBins;
+    totG-=minG*(float)data->nBins;
     if((totG+totC)>0.0)cov=totC/(totC+totG*rhoRatio);
     else               cov=-1.0;
   }else{
