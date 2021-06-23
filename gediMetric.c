@@ -652,10 +652,9 @@ float snrBeamSense(float falsePosThresh,float gWidth,float *wave,int nBins,float
   float bSense=0;
 
   /*find integral*/
-  if(!pcl){
-    for(i=0;i<nBins;i++)totN+=noised[i];
-    totN-=(float)nBins*meanNoise;
-  }else for(i=0;i<nBins;i++)totN+=fabs(noised[i]);
+  for(i=0;i<nBins;i++)totN+=noised[i];
+  //if(!pcl)
+  totN-=(float)nBins*meanNoise;
   totN*=res;
 
   /*integral for threshold*/
@@ -775,7 +774,7 @@ float snrMeanNoise(float *smoothed,int nBins,float res,int *sBin,int *eBin)
   *sBin=*eBin=-1;
 
   /*buffer from start and end for signal to noise*/
-  buff=15.0;
+  buff=25.0;
   *sBin=(int)(buff/res);
   *eBin=nBins-(int)(buff/res);
 
@@ -842,14 +841,14 @@ void allocateSNR(control *dimage)
 
 
   /*smoothing widths*/
-  dimage->snr->minSig=0.5;
-  dimage->snr->maxSig=0.5;
-  dimage->snr->dSig=0.25;
+  dimage->snr->minSig=0.1;
+  dimage->snr->maxSig=2.5;
+  dimage->snr->dSig=0.2;
   dimage->snr->nSig=(int)((dimage->snr->maxSig-dimage->snr->minSig)/dimage->snr->dSig+1.0);
 
   /*min widths*/
   dimage->snr->minWid=1;
-  dimage->snr->maxWid=1;
+  dimage->snr->maxWid=9;
   dimage->snr->dWid=2;
   dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid+1;
 
