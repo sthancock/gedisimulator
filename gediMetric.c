@@ -523,12 +523,13 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   float sWidth=0,gWidth=0;
   float *smoothed=NULL,meanNoise=0;
   float *smooGr=NULL;
-  float falsePosThresh=0;
+  float falsePosThresh=0,falseNegThresh=0;
   float snrMeanNoise(float *,int,float,int *,int *);
   float *snrNoiseHist(float *,int,float,int,int,int *,int,float *,float *,float *,dataStruct *);
   float *noiseHist=NULL,minHist=0,maxHist=0,histRes=0;
   float snrPosThresh(float *,float,float,int,float,float);
-  float snrBeamSense(float,float,float *,int,float,float,float *,char);
+  float snrNegThresh(float *,float,float,int,float,float,float,float);
+  float snrBeamSense(float,float,float,float *,int,float,float,float *,char);
   float snrLinkMarginPCL(float,float,float,float,float *,int,float);
   float snrLinkMargin(float,float *,float,int,dataStruct *);
   void allocateSNR(control *);
@@ -566,6 +567,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
       /*find failure prob threshold*/
       falsePosThresh=snrPosThresh(noiseHist,minHist,histRes,histBins,dimage->snr->falsePosRate,data->res);
+      falseNegThresh=snrNegThresh(noiseHist,minHist,histRes,histBins,dimage->snr->falseNegRate,data->res*(float)minWidth,gWidth,meanNoise);
 
       /*link margin and beam sense from ground amplitude*/
       if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
@@ -575,7 +577,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
       }
 
      /*beam sense from ground amplitude*/
-     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,gWidth,data->wave[data->useType],data->nBins,data->res,\
+     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],data->nBins,data->res,\
                                    meanNoise,data->noised,dimage->gediIO.pclPhoton+dimage->gediIO.pcl);
 
       TIDY(noiseHist);
@@ -645,7 +647,7 @@ float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins
 /*####################################################*/
 /*find beam sensitivity for SNR*/
 
-float snrBeamSense(float falsePosThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,char pcl)
+float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,char pcl)
 {
   int i=0;
   float gInt=0,totN=0.0;
@@ -658,11 +660,43 @@ float snrBeamSense(float falsePosThresh,float gWidth,float *wave,int nBins,float
   totN*=res;
 
   /*integral for threshold*/
-  gInt=(falsePosThresh-meanNoise)*gWidth*sqrt(2.0*M_PI);
+  gInt=(falseNegThresh+falsePosThresh-meanNoise)*gWidth*sqrt(2.0*M_PI);
   bSense=1.0-gInt/totN;  
 
   return(bSense);
 }/*snrBeamSense*/
+
+
+/*####################################################*/
+/*find failure prob threshold*/
+
+float snrNegThresh(float *noiseHist,float minHist,float histRes,int histBins,float falseNegRate,float minWidth,float gWidth,float meanNoise)
+{
+  int i=0;
+  float A=0;
+  float max=0,hOffset=0;
+  float falseNegThresh=0;
+
+  /*find maximum*/
+  max=-1000.0;
+  for(i=0;i<histBins;i++){
+    if(noiseHist[i]>max)max=noiseHist[i];
+  }
+
+  /*find difference between min width and peak*/
+  hOffset=gaussian((double)minWidth/2.0,(double)gWidth,0.0)*gWidth*sqrt(2.0*M_PI);;
+
+  /*find the threshold*/
+  for(i=histBins-1;i>=0;i--){
+    if((noiseHist[i]/max)>=falseNegRate){
+      A=(float)i*histRes+minHist-meanNoise;
+      falseNegThresh=A*(1.0-hOffset);
+      break;
+    }
+  }
+
+  return(falseNegThresh);
+}/*snrNegThresh*/
 
 
 /*####################################################*/
