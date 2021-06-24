@@ -605,7 +605,7 @@ float snrLinkMarginPCL(float falsePosThresh,float meanNoise,float gWidth,float c
   totE*=res;
 
   /*find hypothetical ground amplitude*/
-  gAmp=totE*cov/(gWidth*sqrt(2.0*M_PI));
+  gAmp=totE*(1.0-cov)/(gWidth*sqrt(2.0*M_PI));
   linkM=10.0*log10(gAmp/(falsePosThresh-meanNoise));
 
   return(linkM);
