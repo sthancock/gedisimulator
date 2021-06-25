@@ -552,8 +552,8 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
     /*find ground properties*/
     if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
+      gStDev=data->res*4.0;
       gWidth=sqrt(data->res*data->res*4.0+sWidth*sWidth);
-      gStDev=data->res*2.0;
     }else{
       gWidth=sqrt(data->gStdev*data->gStdev+sWidth*sWidth);  /*else use observed width*/
       gStDev=data->gStdev;
