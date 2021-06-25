@@ -529,7 +529,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   float *noiseHist=NULL,minHist=0,maxHist=0,histRes=0;
   float snrPosThresh(float *,float,float,int,float,float);
   float snrNegThresh(float *,float,float,int,float,float,float,float,float *);
-  float snrBeamSense(float,float,float,float *,int,float,float,float *,float,float,float);
+  float snrBeamSense(float,float,float,float *,int,float,float,float *,float,float);
   float snrLinkMarginPCL(float,float,float,float,float,float *,int,float);
   float snrLinkMargin(float,float *,float,int,dataStruct *);
   void allocateSNR(control *);
@@ -539,7 +539,8 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
   /*save covers and widths*/
   dimage->snr->cov[numb]=data->cov;
-  dimage->snr->gWidth[numb]=data->gStdev;
+  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl)gWidth=2.0*data->res;
+  else                               dimage->snr->gWidth[numb]=data->gStdev;
 
   /*loop over smoothing widths*/
   for(j=0;j<dimage->snr->nSig;j++){
@@ -549,14 +550,11 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
     smoothed=smooth(sWidth,data->nBins,data->noised,data->res);
     if(!dimage->gediIO.pclPhoton&&!dimage->gediIO.pcl)smooGr=smooth(sWidth,data->nBins,data->ground[data->useType],data->res);
 
-
     /*find ground properties*/
     if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
-      gStDev=data->res*2.0;
       gWidth=sqrt(data->res*data->res*4.0+sWidth*sWidth);
     }else{
       gWidth=sqrt(data->gStdev*data->gStdev+sWidth*sWidth);  /*else use observed width*/
-      gStDev=data->gStdev;
     }
 
     /*find mean noise*/
@@ -581,7 +579,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
       }
 
      /*beam sense from ground amplitude*/
-     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise,data->noised,dimage->rhoRatio,gStDev,hOffset);
+     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise,data->noised,dimage->rhoRatio,hOffset);
 
       TIDY(noiseHist);
     }/*min width loop*/
@@ -650,7 +648,7 @@ float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins
 /*####################################################*/
 /*find beam sensitivity for SNR*/
 
-float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,float rhoRatio,float gStDev,float hOffset)
+float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,float rhoRatio,float hOffset)
 {
   int i=0;
   float gInt=0,totN=0.0,cInt=0;
