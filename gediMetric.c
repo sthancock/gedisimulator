@@ -883,7 +883,7 @@ void allocateSNR(control *dimage)
 
   /*min widths*/
   dimage->snr->minWid=1;
-  dimage->snr->maxWid=1;
+  dimage->snr->maxWid=9;
   dimage->snr->dWid=2;
   dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid+1;
 
