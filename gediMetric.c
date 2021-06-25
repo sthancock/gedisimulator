@@ -520,7 +520,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   int i=0,j=0,minWidth=0;
   int eBin=0,sBin=0;
   int histBins=0;
-  float sWidth=0,gWidth=0,gStDev=0;;
+  float sWidth=0,gWidth=0;
   float *smoothed=NULL,meanNoise=0;
   float *smooGr=NULL,hOffset=0;
   float falsePosThresh=0,falseNegThresh=0;
