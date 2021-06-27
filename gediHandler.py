@@ -305,6 +305,7 @@ class gediData(object):
       self.nBins=self.lenInds[i]
 
     self.z=np.linspace(self.Z0[i],self.ZN[i],num=self.nBins)
+    self.res=(self.Z0[i]-self.ZN[i])/(self.nBins-1)
     return
 
 
