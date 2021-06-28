@@ -3538,7 +3538,6 @@ void packGEDIhdf(waveStruct *waves,gediHDF *hdfData,int waveNumb,gediIOstruct *g
     if(start<0)start=0;
     buff=0.0;
     TIDY(thresh);
-    /*fprintf(stdout,"Start %d\n",start);*/
   }
 
   /*copy data*/
@@ -3696,7 +3695,7 @@ waveStruct *allocateGEDIwaves(gediIOstruct *gediIO,gediRatStruct *gediRat,pCloud
   /*determine wave bounds*/
   if(gediIO->pcl==0)buff=35.0;
   else              buff=0.0;
-  if(gediIO->pulse)buff+=(double)gediIO->pulse->nBins*(double)gediIO->pRes/2.0;
+  if(gediIO->pulse||gediIO->pcl)buff+=(double)gediIO->pulse->nBins*(double)gediIO->pRes/2.0;
   minZ=100000000000.0;
   maxZ=-100000000000.0;
   hasPoints=0;
@@ -4005,7 +4004,7 @@ void waveFromPointCloud(gediRatStruct *gediRat, gediIOstruct *gediIO,pCloudStruc
         if(gediRat->pulseAfter==0){
           /*loop over pulse array*/
           for(j=0;j<gediIO->pulse->nBins;j++){
-            bin=(int)((waves->maxZ-data[numb]->z[i]+(double)gediIO->pulse->x[j])/(double)gediIO->res);
+            bin=(int)floor((waves->maxZ-data[numb]->z[i]+(double)gediIO->pulse->x[j])/(double)gediIO->res);
             if((bin>=0)&&(bin<waves->nBins)){
               if(gediIO->useInt)waves->wave[0][bin]+=refl*gediIO->pulse->y[j];
               if(gediIO->useCount)waves->wave[(int)gediIO->useInt][bin]+=rScale*gediIO->pulse->y[j];
@@ -4024,7 +4023,7 @@ void waveFromPointCloud(gediRatStruct *gediRat, gediIOstruct *gediIO,pCloudStruc
             }/*bin bound check*/
           }/*pulse bin loop*/
         }else{   /*bin up to smooth later*/
-          bin=(int)((waves->maxZ-data[numb]->z[i])/(double)gediIO->res);
+          bin=(int)floor((waves->maxZ-data[numb]->z[i])/(double)gediIO->res);
           if((bin>=0)&&(bin<waves->nBins)){
             if(gediIO->useInt)waves->wave[0][bin]+=refl;
             if(gediIO->useCount)waves->wave[(int)gediIO->useInt][bin]+=rScale;
@@ -4080,6 +4079,7 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
 {
   int i=0,j=0,k=0;
   int bin=0;
+  int pclSbin=0,pclEbin=0;  /*start and end bins for pcl*/
   float **temp=NULL;
   float **tempGr=NULL;
   float **tempC=NULL;
@@ -4109,6 +4109,12 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
     }
   }/*allocate temporary space*/
 
+  /*start and end bounds if needed*/
+  if(gediIO->pcl){
+    pclSbin=(int)floor(((float)gediIO->pulse->nBins*gediIO->pRes)/gediIO->res);
+    pclEbin=waves->nBins-(int)floor(((float)gediIO->pulse->nBins*gediIO->pRes)/gediIO->res);
+  }
+
   /*smooth by pulse shape*/
   /*loop over methods*/
   for(k=0;k<waves->nWaves;k++){
@@ -4122,12 +4128,19 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
         tempC[k][i]=0.0;
       }
 
+      /*is PCL, only convolve areas that completely overlap*/
+      if(gediIO->pcl){
+        if((i<pclSbin)||(i>=pclEbin)){
+          continue;
+        }
+      }
+
       /*loop over pulse bins*/
       for(j=0;j<gediIO->pulse->nBins;j++){
 
         /*waveform array bin*/
-        if(!gediIO->pcl)bin=i+(int)floor((float)((gediIO->pulse->centBin-j)+0.1)*gediIO->pRes/gediIO->res);
-        else            bin=i+(int)floor((float)(j-gediIO->pulse->centBin+0.1)*gediIO->pRes/gediIO->res);
+        if(!gediIO->pcl)bin=i+(int)floor((float)(gediIO->pulse->centBin-j)*gediIO->pRes/gediIO->res);
+        else            bin=i+(int)floor((float)(j-gediIO->pulse->centBin)*gediIO->pRes/gediIO->res);
 
         /*are we within the pulse array?*/
         if((bin>=0)&&(bin<waves->nBins)){
@@ -4137,7 +4150,7 @@ void applyPulseShape(gediIOstruct *gediIO,gediRatStruct *gediRat,waveStruct *wav
             tempGr[k][i]+=waves->ground[k][bin]*gediIO->pulse->y[j];
             tempC[k][i]+=waves->canopy[k][bin]*gediIO->pulse->y[j];
           }
-          contN+=1.0; //gediIO->pulse->y[j]-minPulse;
+          contN+=gediIO->pulse->y[j]-minPulse;
         }/*bin bound check*/
       }/*pulse bin loop*/
 
