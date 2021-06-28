@@ -539,8 +539,8 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
   /*save covers and widths*/
   dimage->snr->cov[numb]=data->cov;
-  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl)gWidth=2.0*data->res;
-  else                               dimage->snr->gWidth[numb]=data->gStdev;
+  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl)dimage->snr->gWidth[numb]=(0.15>data->res)?0.15:data->res;
+  else                                            dimage->snr->gWidth[numb]=data->gStdev;
 
   /*loop over smoothing widths*/
   for(j=0;j<dimage->snr->nSig;j++){
@@ -551,11 +551,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
     if(!dimage->gediIO.pclPhoton&&!dimage->gediIO.pcl)smooGr=smooth(sWidth,data->nBins,data->ground[data->useType],data->res);
 
     /*find ground properties*/
-    if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
-      gWidth=sqrt(data->res*data->res*4.0+sWidth*sWidth);
-    }else{
-      gWidth=sqrt(data->gStdev*data->gStdev+sWidth*sWidth);  /*else use observed width*/
-    }
+    gWidth=sqrt(dimage->snr->gWidth[numb]*dimage->snr->gWidth[numb]+sWidth*sWidth);
 
     /*find mean noise*/
     meanNoise=snrMeanNoise(smoothed,data->nBins,data->res,&sBin,&eBin);
