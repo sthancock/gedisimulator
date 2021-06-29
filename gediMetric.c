@@ -872,7 +872,7 @@ void allocateSNR(control *dimage)
 
 
   /*smoothing widths*/
-  dimage->snr->minSig=0.1;
+  dimage->snr->minSig=0.0;
   dimage->snr->maxSig=2.5;
   dimage->snr->dSig=0.2;
   dimage->snr->nSig=(int)((dimage->snr->maxSig-dimage->snr->minSig)/dimage->snr->dSig+1.0);
