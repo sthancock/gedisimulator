@@ -3694,7 +3694,7 @@ waveStruct *allocateGEDIwaves(gediIOstruct *gediIO,gediRatStruct *gediRat,pCloud
 
   /*determine wave bounds*/
   if(gediIO->pcl==0)buff=35.0;
-  else              buff=0.0;
+  else              buff=(double)gediIO->pulse->nBins*(double)gediIO->pRes;
   if(gediIO->pulse||gediIO->pcl)buff+=(double)gediIO->pulse->nBins*(double)gediIO->pRes/2.0;
   minZ=100000000000.0;
   maxZ=-100000000000.0;
