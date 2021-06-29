@@ -874,14 +874,14 @@ void allocateSNR(control *dimage)
 
 
   /*smoothing widths*/
-  dimage->snr->minSig=1.0;
-  dimage->snr->maxSig=1.0; //2.5;
+  dimage->snr->minSig=0.0;
+  dimage->snr->maxSig=2.5;
   dimage->snr->dSig=0.2;
   dimage->snr->nSig=(int)((dimage->snr->maxSig-dimage->snr->minSig)/dimage->snr->dSig+1.0);
 
   /*min widths*/
   dimage->snr->minWid=1;
-  dimage->snr->maxWid=1; //9;
+  dimage->snr->maxWid=/9;
   dimage->snr->dWid=2;
   dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid+1;
 
