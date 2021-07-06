@@ -60,7 +60,7 @@ float *uncompressPhotons(float *wave,dataStruct *data,photonStruct *photonCount,
   float *photWave=NULL;
   float *corrWave=NULL;
   float *crossCorrelateWaves(float *,float,int,pulseStruct *,float);
-  float *crossCorrelateTime(float *,float,int,pulseStruct *,float);
+  float *crossCorrelateTime(float *,float,int,pulseStruct *,float,float);
   void writePCLwaves(dataStruct *,float *,float *,float *);
 
   #ifdef DEBUG
@@ -74,12 +74,13 @@ float *uncompressPhotons(float *wave,dataStruct *data,photonStruct *photonCount,
     exit(1);
   }
 
+
   /*first perform photon counting, if needed*/
   if(gediIO->pclPhoton)photWave=countWaveform(wave,data,photonCount,gediIO->den,noise);
   else                 photWave=wave;
 
   /*perform cross-correlation*/
-  corrWave=crossCorrelateTime(photWave,data->res,data->nBins,gediIO->pulse,gediIO->pRes);
+  corrWave=crossCorrelateTime(photWave,data->res,data->nBins,gediIO->pulse,gediIO->pRes,gediIO->pclSwidth);
   //corrWave=crossCorrelateWaves(photWave,data->res,data->nBins,gediIO->pulse,gediIO->pRes);
 
   #ifdef DEBUG
@@ -172,11 +173,12 @@ void resamplePclPulse(pulseStruct *pulse,float res,float pRes)
 /*####################################################*/
 /*perform a cross-correlation in the time domain*/
 
-float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse,float pRes)
+float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse,float pRes,float pclSwidth)
 {
   int i=0,j=0,bin=0;
   int thisCont=0;
   float *compCorr=NULL;
+  float *smooWave=NULL;
   float meanP=0,meanW=0;
   float stdevP=0,stdevW=0;
   void resamplePclPulse(pulseStruct *,float,float);
@@ -187,26 +189,36 @@ float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse
   /*allocate resampled pulse if needed*/
   if(pulse->resamp==NULL)resamplePclPulse(pulse,res,pRes);
 
+  /*if not already done, smooth the pulse*/
+  if(pulse->pclSmoo==NULL){
+    if(pclSwidth>TOL)pulse->pclSmoo=smooth(pclSwidth,pulse->nBins,pulse->resamp,pRes);
+    else             pulse->pclSmoo=pulse->resamp;
+  }
+
+  /*smooth waveform if needed*/
+  if(pclSwidth>TOL)smooWave=smooth(pclSwidth,nBins,photWave,res);
+  else             smooWave=photWave;
+
   /*find the average of the pulse*/
   meanP=0.0;
-  for(i=0;i<pulse->rBins;i++)meanP+=pulse->resamp[i];
+  for(i=0;i<pulse->rBins;i++)meanP+=pulse->pclSmoo[i];
   meanP/=(float)pulse->rBins;
-  //meanP=singleMedian(pulse->resamp,pulse->rBins);
+  //meanP=singleMedian(pulse->pclSmoo,pulse->rBins);
 
   /*find the stdev of the pulse*/
   stdevP=0.0;
-  for(i=0;i<pulse->rBins;i++)stdevP+=(pulse->resamp[i]-meanP)*(pulse->resamp[i]-meanP);
+  for(i=0;i<pulse->rBins;i++)stdevP+=(pulse->pclSmoo[i]-meanP)*(pulse->pclSmoo[i]-meanP);
   stdevP=sqrt(stdevP/(float)pulse->rBins);
 
   /*find the average of the wave*/
   meanW=0.0;
-  for(i=0;i<nBins;i++)meanW+=photWave[i];
+  for(i=0;i<nBins;i++)meanW+=smooWave[i];
   meanW/=(float)nBins;
-  //meanW=singleMedian(photWave,nBins);
+  //meanW=singleMedian(smooWave,nBins);
 
   /*find the stdev of the wave*/
   stdevW=0.0;
-  for(i=0;i<nBins;i++)stdevW+=(photWave[i]-meanW)*(photWave[i]-meanW);
+  for(i=0;i<nBins;i++)stdevW+=(smooWave[i]-meanW)*(smooWave[i]-meanW);
   stdevW=sqrt(stdevW/(float)nBins);
 
   /*loop over bins in time domain*/
@@ -221,8 +233,8 @@ float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse
 
       /*are we within the pulse array?*/
       if((bin>=0)&&(bin<nBins)){
-        compCorr[i]+=(photWave[bin]-meanW)*(pulse->resamp[pulse->rBins-(j+1)]-meanP)/(stdevP*stdevW);
-        //compCorr[i]+=photWave[bin]*pulse->resamp[pulse->rBins-(j+1)]/(stdevP*stdevW);
+        compCorr[i]+=(smooWave[bin]-meanW)*(pulse->pclSmoo[pulse->rBins-(j+1)]-meanP)/(stdevP*stdevW);
+        //compCorr[i]+=smooWave[bin]*pulse->pclSmoo[pulse->rBins-(j+1)]/(stdevP*stdevW);
         thisCont++;
       }
     }/*pulse bin loop*/
@@ -231,6 +243,8 @@ float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse
     //if(thisCont>0)compCorr[i]/=(float)thisCont;
     compCorr[i]/=(float)pulse->rBins;
   }/*wave bin loop*/
+
+  if(smooWave!=photWave)TIDY(smooWave);
 
   return(compCorr);
 }/*crossCorrelateTime*/

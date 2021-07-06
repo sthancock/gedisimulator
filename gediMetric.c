@@ -408,7 +408,7 @@ int main(int argc,char **argv)
   if(!dimage->ice2&&!dimage->onlySNR)fprintf(stdout,"Written to %s.metric.txt\n",dimage->outRoot);
   if(dimage->onlySNR)writeSNR(dimage->outRoot,dimage->snr);
   #ifdef USEPHOTON
-  else             fprintf(stdout,"Written to %s\n",dimage->photonCount.outNamen);
+  if(dimage->ice2)fprintf(stdout,"Written to %s\n",dimage->photonCount.outNamen);
   #endif
 
 
@@ -441,6 +441,7 @@ int main(int argc,char **argv)
     if(dimage->gediIO.pulse){
       TIDY(dimage->gediIO.pulse->x);
       TIDY(dimage->gediIO.pulse->y);
+      if(dimage->gediIO.pulse->pclSmoo!=dimage->gediIO.pulse->resamp)TIDY(dimage->gediIO.pulse->pclSmoo);
       TIDY(dimage->gediIO.pulse->resamp);
       TIDY(dimage->gediIO.pulse);
     }
@@ -2316,6 +2317,7 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.pcl=0; /*full waveform rather thsn PCL*/
   dimage->gediIO.pclPhoton=0;  
   dimage->gediIO.writePcl=0;
+  dimage->gediIO.pclSwidth=0.0;  /*don't pre-smooth before PCL*/
   /*others*/
   rhoG=0.4;                   /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
   rhoC=0.57;                  /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
@@ -2551,6 +2553,9 @@ control *readCommands(int argc,char **argv)
         dimage->gediIO.pclPhoton=1;        /*Pulse compression lidar with photon counting*/
       }else if(!strncasecmp(argv[i],"-pcl",4)){
         dimage->gediIO.pcl=1;              /*Pulse compression lidar*/
+      }else if(!strncasecmp(argv[i],"-preSmooPCL",11)){
+        checkArguments(1,i,argc,"-preSmooPCL");
+        dimage->gediIO.pclSwidth=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-writePcl",4)){
         dimage->gediIO.writePcl=1;
       }else if(!strncasecmp(argv[i],"-shotNoise",4)){
@@ -2671,6 +2676,7 @@ void writeHelp()
   fprintf(stdout,"\nUnfinished\n\
 -photonPCL;       convert to photon counting pulse-compressed before processing\n\
 -pcl;             pulse-compressed processing\n\
+-preSmooPCL sig;  pre-smooth before PCL with a Gaussian\n\
 -writePcl;        write out the intermediate PCL waves\n\
 -shotNoise;       apply shot noise\n\
 ");

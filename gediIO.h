@@ -43,6 +43,7 @@ typedef struct{
 
   /*resampled pulse, for PCL*/
   float *resamp;  /*resampled pulse for speed*/
+  float *pclSmoo; /*smoothed PCL pulse*/
   int rBins;      /*number of resampled bins*/
   int rCent;      /*resampled centre*/
 }pulseStruct;
@@ -176,6 +177,8 @@ typedef struct{
   char photonWave;   /*make a photon-count pseudo-waveform*/
   char pclPhoton;    /*use PCL photon counting*/
   char writePcl;     /*write PCL intermediate waves*/
+  float pclSwidth;   /*pre-smooth before PCL width*/
+  float *pclPulse;   /*PCL pulse if smoothed*/
 
   /*others*/
   int nMessages;  /*number of progress messages*/
