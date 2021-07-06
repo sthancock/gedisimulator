@@ -179,6 +179,8 @@ typedef struct{
   char writePcl;     /*write PCL intermediate waves*/
   float pclSwidth;   /*pre-smooth before PCL width*/
   float *pclPulse;   /*PCL pulse if smoothed*/
+  float hannWidth;    /*width of Hann filter if used*/
+  pulseStruct *hannFilt;  /*Hann filter if used*/
 
   /*others*/
   int nMessages;  /*number of progress messages*/

@@ -58,10 +58,13 @@
 float *uncompressPhotons(float *wave,dataStruct *data,photonStruct *photonCount,noisePar *noise,gediIOstruct *gediIO)
 {
   float *photWave=NULL;
-  float *corrWave=NULL;
+  float *corrWave=NULL,*tempSmoo=NULL;
   float *crossCorrelateWaves(float *,float,int,pulseStruct *,float);
   float *crossCorrelateTime(float *,float,int,pulseStruct *,float,float);
+  float *applyHannFilter(float *,int,pulseStruct *);
   void writePCLwaves(dataStruct *,float *,float *,float *);
+  pulseStruct *setHannFilter(float,float);
+
 
   #ifdef DEBUG
   int i=0;
@@ -83,6 +86,15 @@ float *uncompressPhotons(float *wave,dataStruct *data,photonStruct *photonCount,
   corrWave=crossCorrelateTime(photWave,data->res,data->nBins,gediIO->pulse,gediIO->pRes,gediIO->pclSwidth);
   //corrWave=crossCorrelateWaves(photWave,data->res,data->nBins,gediIO->pulse,gediIO->pRes);
 
+  /*Hann filter if needed*/
+  if(gediIO->hannWidth>TOL){
+    if(gediIO->hannFilt==NULL)gediIO->hannFilt=setHannFilter(gediIO->hannWidth,data->res);
+    tempSmoo=applyHannFilter(corrWave,data->nBins,gediIO->hannFilt);
+    TIDY(corrWave);
+    corrWave=tempSmoo;
+    tempSmoo=NULL;
+  }
+
   #ifdef DEBUG
   for(i=0;i<data->nBins;i++)fprintf(stdout,"%d %f %f %f %f debug2\n",c,data->z[i],wave[i],photWave[i],corrWave[i]);
   c++;
@@ -97,6 +109,70 @@ float *uncompressPhotons(float *wave,dataStruct *data,photonStruct *photonCount,
 
   return(corrWave);
 }/*uncompressPhotons*/
+
+
+/*####################################################*/
+/*apply a Hann filter*/
+
+float *applyHannFilter(float *corrWave,int nBins,pulseStruct *hannFilt)
+{
+  int i=0,j=0,bin=0;
+  float contN=0;
+  float *smoo=NULL;
+
+  /*allocate space*/
+  smoo=falloc(nBins,"Hann filtered wave",0);
+
+  /*loop over waveform bins*/
+  for(i=0;i<nBins;i++){
+    smoo[i]=contN=0.0;
+
+    /*loop over pulse and smooth*/
+    for(j=0;j<hannFilt->nBins;j++){
+      bin=i+(j-hannFilt->centBin);   /*Hann filter resolution is matched to waveform*/
+
+      if((bin>=0)&&(bin<nBins)){
+        smoo[i]+=corrWave[bin]*hannFilt->y[j];
+        contN+=hannFilt->y[j];
+      }
+    }
+    if(contN>0.0)smoo[i]/=contN;
+  }
+
+  return(smoo);
+}/*applyHannFilter*/
+
+
+/*####################################################*/
+/*set the Hann filter structure*/
+
+pulseStruct *setHannFilter(float sWidth,float res)
+{
+  int i=0;
+  pulseStruct *hannFilt=NULL;
+
+  /*allocate space*/
+  if(!(hannFilt=(pulseStruct *)calloc(1,sizeof(pulseStruct)))){
+    fprintf(stderr,"error Hann filter allocation.\n");
+    exit(1);
+  }
+
+  /*determine number of bins*/
+  hannFilt->nBins=((int)(sWidth/res+1)/2)*2+1;  /*force to be odd*/
+  hannFilt->centBin=hannFilt->nBins/2;
+
+  /*allocate array space*/
+  hannFilt->x=falloc(hannFilt->nBins,"Hann filter x",0);
+  hannFilt->y=falloc(hannFilt->nBins,"Hann filter y",0);
+
+  /*set values*/
+  for(i=0;i<hannFilt->nBins;i++){
+    hannFilt->x[i]=(float)(i-hannFilt->centBin)*res;
+    hannFilt->y[i]=pow(cos(M_PI*(float)(i-hannFilt->centBin)/(float)hannFilt->nBins),2);
+  }
+
+  return(hannFilt);
+}/*setHannFilter*/
 
 
 /*####################################################*/

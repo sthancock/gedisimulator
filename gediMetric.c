@@ -445,6 +445,11 @@ int main(int argc,char **argv)
       TIDY(dimage->gediIO.pulse->resamp);
       TIDY(dimage->gediIO.pulse);
     }
+    if(dimage->gediIO.hannFilt){
+      TIDY(dimage->gediIO.hannFilt->x);
+      TIDY(dimage->gediIO.hannFilt->y);
+      TIDY(dimage->gediIO.hannFilt);
+    }
     dimage->gediIO.den->nGauss=0;
     #ifdef USEPHOTON
     if(dimage->photonCount.opoo){
@@ -2318,6 +2323,8 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.pclPhoton=0;  
   dimage->gediIO.writePcl=0;
   dimage->gediIO.pclSwidth=0.0;  /*don't pre-smooth before PCL*/
+  dimage->gediIO.hannWidth=0.0;
+  dimage->gediIO.hannFilt=NULL;  /*no Hann filter*/
   /*others*/
   rhoG=0.4;                   /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
   rhoC=0.57;                  /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
@@ -2556,6 +2563,9 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-preSmooPCL",11)){
         checkArguments(1,i,argc,"-preSmooPCL");
         dimage->gediIO.pclSwidth=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-hann",5)){
+        checkArguments(1,i,argc,"-hann");
+        dimage->gediIO.hannWidth=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-writePcl",4)){
         dimage->gediIO.writePcl=1;
       }else if(!strncasecmp(argv[i],"-shotNoise",4)){
@@ -2677,6 +2687,7 @@ void writeHelp()
 -photonPCL;       convert to photon counting pulse-compressed before processing\n\
 -pcl;             pulse-compressed processing\n\
 -preSmooPCL sig;  pre-smooth before PCL with a Gaussian\n\
+-hann width;      apply a Hann filter after PCL\n\
 -writePcl;        write out the intermediate PCL waves\n\
 -shotNoise;       apply shot noise\n\
 ");
