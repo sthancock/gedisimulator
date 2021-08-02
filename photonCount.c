@@ -318,7 +318,6 @@ float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse
     /*normalise*/
     //if(thisCont>0)compCorr[i]/=(float)thisCont;
     compCorr[i]/=(float)pulse->rBins;
-
   }/*wave bin loop*/
 
   if(smooWave!=photWave)TIDY(smooWave);
