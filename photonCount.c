@@ -267,7 +267,7 @@ float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse
 
   /*if not already done, smooth the pulse*/
   if(pulse->pclSmoo==NULL){
-    if(pclSwidth>TOL)pulse->pclSmoo=smooth(pclSwidth,pulse->nBins,pulse->resamp,pRes);
+    if(pclSwidth>TOL)pulse->pclSmoo=smooth(pclSwidth,pulse->nBins,pulse->resamp,res);
     else             pulse->pclSmoo=pulse->resamp;
   }
 
@@ -318,6 +318,7 @@ float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse
     /*normalise*/
     //if(thisCont>0)compCorr[i]/=(float)thisCont;
     compCorr[i]/=(float)pulse->rBins;
+
   }/*wave bin loop*/
 
   if(smooWave!=photWave)TIDY(smooWave);
