@@ -40,6 +40,12 @@ typedef struct{
   int centBin;  /*peak bin*/
   float *y;
   float *x;
+
+  /*resampled pulse, for PCL*/
+  float *resamp;  /*resampled pulse for speed*/
+  float *pclSmoo; /*smoothed PCL pulse*/
+  int rBins;      /*number of resampled bins*/
+  int rCent;      /*resampled centre*/
 }pulseStruct;
 
 
@@ -151,10 +157,9 @@ typedef struct{
 
   /*system pulse*/
   char readPulse;      /*read pulse to simulate with*/
-  char pulseFile[200];
+  char pulseFile[400];
   pulseStruct *pulse;
   float pRes;
-  char pcl;            /*use PCL (do not pad return)*/
 
   /*number of waves to simulate*/
   int nTypeWaves;    /*number of waves simulated*/
@@ -166,6 +171,16 @@ typedef struct{
   double bounds[4]; /*minX minY, maxX maxY*/
   int bEPSG;        /*epsg of bounds*/
   int wEPSG;        /*epsg of waveform data*/
+
+  /*pcl*/
+  char pcl;          /*use PCL full-waveform*/
+  char photonWave;   /*make a photon-count pseudo-waveform*/
+  char pclPhoton;    /*use PCL photon counting*/
+  char writePcl;     /*write PCL intermediate waves*/
+  float pclSwidth;   /*pre-smooth before PCL width*/
+  float *pclPulse;   /*PCL pulse if smoothed*/
+  float hannWidth;    /*width of Hann filter if used*/
+  pulseStruct *hannFilt;  /*Hann filter if used*/
 
   /*others*/
   int nMessages;  /*number of progress messages*/
@@ -276,7 +291,7 @@ typedef struct{
   float fSigma;    /*footprint width*/
   float *pulse;    /*pulse*/
   float pRes;      /*pulse resolution*/
-  int nPbins;      /*number ofpulse bins*/
+  int nPbins;      /*number of pulse bins*/
   /*beams*/
   int nTypeWaves;  /*number of waveform types (frac, count and int)*/
   float **wave;    /*waveform*/
@@ -353,6 +368,7 @@ void packGEDIhdf(waveStruct *,gediHDF *,int,gediIOstruct *,gediRatStruct *,int *
 void setBeamsToUse(char *,char *);
 void setBeamsToSkip(char *,char *);
 void setBeamsToRead(char *,char *);
+void modifyGroundRho(dataStruct *,float);
 wFrontStruct *copyFrontFilename(char *);
 float waveformTrueCover(dataStruct *,gediIOstruct *,float);
 float findBlairSense(dataStruct *,gediIOstruct *);

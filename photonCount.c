@@ -14,6 +14,8 @@
 #include "photonCount.h"
 #include "gsl/gsl_fft_complex.h"
 
+//#define DEBUG
+
 
 /*##############################*/
 /*# Generates photon count from#*/
@@ -47,7 +49,7 @@
 /*########################################################################*/
 
 /*tolerances*/
-#define TOL 0.00001
+#define TOL 0.0000001
 
 
 /*####################################################*/
@@ -56,8 +58,18 @@
 float *uncompressPhotons(float *wave,dataStruct *data,photonStruct *photonCount,noisePar *noise,gediIOstruct *gediIO)
 {
   float *photWave=NULL;
-  float *corrWave=NULL;
+  float *corrWave=NULL,*tempSmoo=NULL;
   float *crossCorrelateWaves(float *,float,int,pulseStruct *,float);
+  float *crossCorrelateTime(float *,float,int,pulseStruct *,float,float);
+  float *applyHannFilter(float *,int,pulseStruct *);
+  void writePCLwaves(dataStruct *,float *,float *,float *);
+  pulseStruct *setHannFilter(float,float);
+
+
+  #ifdef DEBUG
+  int i=0;
+  static int c=0;
+  #endif
 
   /*do we have a usable pulse?*/
   if(gediIO->pulse==NULL){
@@ -65,23 +77,257 @@ float *uncompressPhotons(float *wave,dataStruct *data,photonStruct *photonCount,
     exit(1);
   }
 
-  /*first perform photon counting*/
-  photWave=countWaveform(wave,data,photonCount,gediIO->den,noise);
+
+  /*first perform photon counting, if needed*/
+  if(gediIO->pclPhoton)photWave=countWaveform(wave,data,photonCount,gediIO->den,noise);
+  else                 photWave=wave;
 
   /*perform cross-correlation*/
+  corrWave=crossCorrelateTime(photWave,data->res,data->nBins,gediIO->pulse,gediIO->pRes,gediIO->pclSwidth);
   //corrWave=crossCorrelateWaves(photWave,data->res,data->nBins,gediIO->pulse,gediIO->pRes);
-  corrWave=crossCorrelateWaves(wave,data->res,data->nBins,gediIO->pulse,gediIO->pRes);
-  //corrWave=crossCorrelateWaves(gediIO->pulse->y,gediIO->pRes,gediIO->pulse->nBins,gediIO->pulse,gediIO->pRes);
+
+  /*Hann filter if needed*/
+  if(gediIO->hannWidth>TOL){
+    if(gediIO->hannFilt==NULL)gediIO->hannFilt=setHannFilter(gediIO->hannWidth,data->res);
+    tempSmoo=applyHannFilter(corrWave,data->nBins,gediIO->hannFilt);
+    TIDY(corrWave);
+    corrWave=tempSmoo;
+    tempSmoo=NULL;
+  }
+
+  #ifdef DEBUG
+  for(i=0;i<data->nBins;i++)fprintf(stdout,"%d %f %f %f %f debug2\n",c,data->z[i],wave[i],photWave[i],corrWave[i]);
+  c++;
+  #endif
+  if(gediIO->writePcl)writePCLwaves(data,wave,photWave,corrWave);
+
 
   /*tidy up*/
-  TIDY(photWave);
+  if(photWave!=wave){
+    TIDY(photWave);
+  }else photWave=NULL;
 
   return(corrWave);
 }/*uncompressPhotons*/
 
 
 /*####################################################*/
-/*perform a cross-correlation*/
+/*apply a Hann filter*/
+
+float *applyHannFilter(float *corrWave,int nBins,pulseStruct *hannFilt)
+{
+  int i=0,j=0,bin=0;
+  float contN=0;
+  float *smoo=NULL;
+
+  /*allocate space*/
+  smoo=falloc(nBins,"Hann filtered wave",0);
+
+  /*loop over waveform bins*/
+  for(i=0;i<nBins;i++){
+    smoo[i]=contN=0.0;
+
+    /*loop over pulse and smooth*/
+    for(j=0;j<hannFilt->nBins;j++){
+      bin=i+(j-hannFilt->centBin);   /*Hann filter resolution is matched to waveform*/
+
+      if((bin>=0)&&(bin<nBins)){
+        smoo[i]+=corrWave[bin]*hannFilt->y[j];
+        contN+=hannFilt->y[j];
+      }
+    }
+    if(contN>0.0)smoo[i]/=contN;
+  }
+
+  return(smoo);
+}/*applyHannFilter*/
+
+
+/*####################################################*/
+/*set the Hann filter structure*/
+
+pulseStruct *setHannFilter(float sWidth,float res)
+{
+  int i=0;
+  pulseStruct *hannFilt=NULL;
+
+  /*allocate space*/
+  if(!(hannFilt=(pulseStruct *)calloc(1,sizeof(pulseStruct)))){
+    fprintf(stderr,"error Hann filter allocation.\n");
+    exit(1);
+  }
+
+  /*determine number of bins*/
+  hannFilt->nBins=((int)(sWidth/res+1)/2)*2+1;  /*force to be odd*/
+  hannFilt->centBin=hannFilt->nBins/2;
+
+  /*allocate array space*/
+  hannFilt->x=falloc(hannFilt->nBins,"Hann filter x",0);
+  hannFilt->y=falloc(hannFilt->nBins,"Hann filter y",0);
+
+  /*set values*/
+  for(i=0;i<hannFilt->nBins;i++){
+    hannFilt->x[i]=(float)(i-hannFilt->centBin)*res;
+    hannFilt->y[i]=pow(cos(M_PI*(float)(i-hannFilt->centBin)/(float)hannFilt->nBins),2);
+  }
+
+  return(hannFilt);
+}/*setHannFilter*/
+
+
+/*####################################################*/
+/*write PCL waveforms*/
+
+void writePCLwaves(dataStruct *data,float *wave,float *photWave,float *corrWave)
+{
+  int i=0;
+  static int c=0;
+  char waveNamen[250];
+  FILE *opoo=NULL;
+
+  /*name and open file*/
+  sprintf(waveNamen,"pclWave.%s.count.%d.txt",data->waveID,c);
+  if((opoo=fopen(waveNamen,"w"))==NULL){
+    fprintf(stderr,"Error opening output file %s\n",waveNamen);
+    exit(1);
+  }
+
+  /*write data*/
+  fprintf(opoo,"# 1 z, 2 waveform, 3 photonWave, 4 correlated, 5 original\n");
+  for(i=0;i<data->nBins;i++)fprintf(opoo,"%f %.10f %f %.10f %.10f\n",data->z[i],wave[i],photWave[i],corrWave[i],data->wave[0][i]);
+
+  /*close up*/
+  if(opoo){
+    fclose(opoo);
+    opoo=NULL;
+  }
+  fprintf(stdout,"PCL waves written to %s\n",waveNamen);
+  c++;
+
+  return;
+}/*writePCLwaves*/
+
+
+/*####################################################*/
+/*resample a pulse for PCL*/
+
+void resamplePclPulse(pulseStruct *pulse,float res,float pRes)
+{
+  int i=0,*contN=NULL;
+  int bin=0;
+
+  /*allocate space and zero*/
+  pulse->rBins=(int)((float)pulse->nBins*pRes/res);
+  pulse->resamp=falloc(pulse->rBins,"",0);
+  contN=ialloc(pulse->rBins,"",0);
+  for(i=0;i<pulse->rBins;i++){
+    pulse->resamp[i]=0.0;
+    contN[i]=0;
+  }
+
+
+  /*resample pulse*/
+  for(i=0;i<pulse->nBins;i++){
+    bin=(int)floor((float)i*pRes/res);
+    if((bin>=0)&&(bin<pulse->rBins)){
+      pulse->resamp[bin]+=pulse->y[i];
+      contN[bin]++;
+    }
+  }
+
+  /*normalise resampled*/
+  for(i=0;i<pulse->rBins;i++){
+    if(contN[i]>0)pulse->resamp[i]/=(float)contN[i];
+  }
+  TIDY(contN);
+  pulse->rCent=(int)floor((float)pulse->centBin*pRes/res);
+
+  return;
+}/*resamplePclPulse*/
+
+
+/*####################################################*/
+/*perform a cross-correlation in the time domain*/
+
+float *crossCorrelateTime(float *photWave,float res,int nBins,pulseStruct *pulse,float pRes,float pclSwidth)
+{
+  int i=0,j=0,bin=0;
+  int thisCont=0;
+  float *compCorr=NULL;
+  float *smooWave=NULL;
+  float meanP=0,meanW=0;
+  float stdevP=0,stdevW=0;
+  void resamplePclPulse(pulseStruct *,float,float);
+
+  /*allocate space*/
+  compCorr=falloc(nBins,"compCorr",0);
+
+  /*allocate resampled pulse if needed*/
+  if(pulse->resamp==NULL)resamplePclPulse(pulse,res,pRes);
+
+  /*if not already done, smooth the pulse*/
+  if(pulse->pclSmoo==NULL){
+    if(pclSwidth>TOL)pulse->pclSmoo=smooth(pclSwidth,pulse->nBins,pulse->resamp,res);
+    else             pulse->pclSmoo=pulse->resamp;
+  }
+
+  /*smooth waveform if needed*/
+  if(pclSwidth>TOL)smooWave=smooth(pclSwidth,nBins,photWave,res);
+  else             smooWave=photWave;
+
+  /*find the average of the pulse*/
+  meanP=0.0;
+  for(i=0;i<pulse->rBins;i++)meanP+=pulse->pclSmoo[i];
+  meanP/=(float)pulse->rBins;
+  //meanP=singleMedian(pulse->pclSmoo,pulse->rBins);
+
+  /*find the stdev of the pulse*/
+  stdevP=0.0;
+  for(i=0;i<pulse->rBins;i++)stdevP+=(pulse->pclSmoo[i]-meanP)*(pulse->pclSmoo[i]-meanP);
+  stdevP=sqrt(stdevP/(float)pulse->rBins);
+
+  /*find the average of the wave*/
+  meanW=0.0;
+  for(i=0;i<nBins;i++)meanW+=smooWave[i];
+  meanW/=(float)nBins;
+  //meanW=singleMedian(smooWave,nBins);
+
+  /*find the stdev of the wave*/
+  stdevW=0.0;
+  for(i=0;i<nBins;i++)stdevW+=(smooWave[i]-meanW)*(smooWave[i]-meanW);
+  stdevW=sqrt(stdevW/(float)nBins);
+
+  /*loop over bins in time domain*/
+  //for(i=pulse->rCent;i<(nBins-pulse->rCent);i++){ /*step in by the cent bins of the pulse*/
+  for(i=0;i<nBins;i++){
+    compCorr[i]=0.0;
+    thisCont=0;
+
+    /*loop over pulse to convolve*/
+    for(j=0;j<pulse->rBins;j++){
+      bin=i+j-pulse->rCent;  /*bin on the pulse*/
+
+      /*are we within the pulse array?*/
+      if((bin>=0)&&(bin<nBins)){
+        compCorr[i]+=(smooWave[bin]-meanW)*(pulse->pclSmoo[pulse->rBins-(j+1)]-meanP)/(stdevP*stdevW);
+        //compCorr[i]+=smooWave[bin]*pulse->pclSmoo[pulse->rBins-(j+1)]/(stdevP*stdevW);
+        thisCont++;
+      }
+    }/*pulse bin loop*/
+
+    /*normalise*/
+    //if(thisCont>0)compCorr[i]/=(float)thisCont;
+    compCorr[i]/=(float)pulse->rBins;
+  }/*wave bin loop*/
+
+  if(smooWave!=photWave)TIDY(smooWave);
+
+  return(compCorr);
+}/*crossCorrelateTime*/
+
+
+/*####################################################*/
+/*perform a cross-correlation using Fourier*/
 
 float *crossCorrelateWaves(float *photWave,float res,int nBins,pulseStruct *pulse,float pRes)
 {
@@ -89,19 +335,16 @@ float *crossCorrelateWaves(float *photWave,float res,int nBins,pulseStruct *puls
   int numb=0;
   int *contN=NULL;
   float *corrWave=NULL;
-  double meanW=0,meanP=0;
   double *compPulse=NULL;
   double *compWave=NULL;
   double *compCorr=NULL;
   int gsl_fft_complex_radix2_forward(gsl_complex_packed_array,size_t,size_t);
   int gsl_fft_complex_radix2_backward(gsl_complex_packed_array, size_t,size_t);
-  void removeAsymmetryPCL(double *,int);
-
 
   /*FFT requires that array is a power of 2 long*/
   numb=pow(2.0,(float)(int)(log((double)nBins)/log(2.0)+1.0));
 
-  /*resample pulse to match waveform*/
+  /*allocate space for resampled complex pulse*/
   compPulse=dalloc(2*numb,"complex pulse",0);
   contN=ialloc(numb,"contribution counter",0);
   for(i=0;i<numb;i++){
@@ -129,24 +372,23 @@ float *crossCorrelateWaves(float *photWave,float res,int nBins,pulseStruct *puls
     contN[bin]++;
   }*/
 
+
+  /*resample pulse to match waveform*/
   for(i=0;i<pulse->nBins;i++){
     bin=(int)((float)i*pRes/res+0.5);
-    if((bin<0)||(bin>numb))continue;
+    if((bin<0)||(bin>=numb))continue;
     compPulse[2*bin]+=(double)pulse->y[i];
     contN[bin]++;
   }
 
-
   /*normalise*/
   for(i=0;i<numb;i++){
-    if(contN[i]>0){
-      compPulse[2*i]/=(float)contN[i];
-    }
+    if(contN[i]>0)compPulse[2*i]/=(float)contN[i];
   }
   TIDY(contN);
 
   /*median of pulse*/
-  meanP=singleMedian(pulse->y,pulse->nBins);
+  //meanP=singleMedian(pulse->y,pulse->nBins);
 
   /*make waveform complex*/
   compWave=dalloc(2*numb,"complex wave",0);
@@ -154,17 +396,17 @@ float *crossCorrelateWaves(float *photWave,float res,int nBins,pulseStruct *puls
     compWave[2*i]=(double)photWave[i];
     compWave[2*i+1]=0.0;  /*imaginary part*/
   }
-  meanW=singleMedian(photWave,nBins);
+  //meanW=singleMedian(photWave,nBins);
   for(i=2*nBins;i<2*numb;i++)compWave[i]=0.0;
 
   /*subtract means*/
-  for(i=numb-1;i>=0;i--){
+  /*for(i=numb-1;i>=0;i--){
     compWave[2*i]-=meanW;
     compPulse[2*i]-=meanP;
-  }
+  }*/
 
   /*remove assymmetry of signal*/
-  removeAsymmetryPCL(compWave,numb);
+  //removeAsymmetryPCL(compWave,numb);
 
   /*fourier transform both*/
   gsl_fft_complex_radix2_forward((gsl_complex_packed_array)compPulse,1,numb);
@@ -174,7 +416,7 @@ float *crossCorrelateWaves(float *photWave,float res,int nBins,pulseStruct *puls
   compCorr=dalloc(2*numb,"complex correlation",0);
   for(i=0;i<numb;i++){
     compCorr[2*i]=compPulse[2*i]*compWave[2*i]+compPulse[2*i+1]*compWave[2*i+1];
-    compCorr[2*i+1]=compPulse[2*i]*compWave[2*i+1]-compPulse[2*i+1]*compWave[2*i];
+    compCorr[2*i+1]=compPulse[2*i+1]*compWave[2*i]-compPulse[2*i]*compWave[2*i+1];
   }
 
   /*inverse fourier*/
@@ -183,7 +425,7 @@ float *crossCorrelateWaves(float *photWave,float res,int nBins,pulseStruct *puls
   /*make real*/
   corrWave=falloc(nBins,"correlated wave",0);
   for(i=0;i<nBins;i++){
-    corrWave[i]=(float)compCorr[2*i];  /*(float)sqrt(compCorr[2*i]*compCorr[2*i]+compCorr[2*i+1]*compCorr[2*i+1]);*/
+    corrWave[i]=(float)compCorr[2*i]; //sqrt(compCorr[2*i]*compCorr[2*i]+compCorr[2*i+1]*compCorr[2*i+1]);
   }
 
   /*tidy up*/
@@ -198,15 +440,19 @@ float *crossCorrelateWaves(float *photWave,float res,int nBins,pulseStruct *puls
 /*####################################################*/
 /*truncate the assymmetry of a waveform for PCL*/
 
-void removeAsymmetryPCL(double *compWave,int numb)
+void removeAsymmetryPCL(float *wave,int numb)
 {
   int i=0;
+  float medianW=0;
+
+  /*find the median*/
+  medianW=singleMedian(wave,numb);
 
   /*find start point*/
   for(i=0;i<numb;i++){
-    /*if less then mean, set to mean*/
-    if(compWave[2*i]>=0.0){
-      for(;i>=0;i--)compWave[2*i]=0.0;
+    /*if less than mean, set to mean*/
+    if(wave[i]>=medianW){
+      for(;i>=0;i--)wave[i]=medianW;
       break;
     }
   }
@@ -214,8 +460,8 @@ void removeAsymmetryPCL(double *compWave,int numb)
   /*find end point*/
   for(i=numb-1;i>=0;i--){
     /*if less then mean, set to mean*/
-    if(compWave[2*i]>=0.0){
-      for(;i<numb;i++)compWave[2*i]=0.0;
+    if(wave[i]>=medianW){
+      for(;i<numb;i++)wave[i]=medianW;
       break;
     }
   }
@@ -225,65 +471,165 @@ void removeAsymmetryPCL(double *compWave,int numb)
 
 
 /*####################################################*/
-/*count photons and make pseudo-waveform*/
+/*produce a photon-counting pseudo-waveform*/
 
 float *countWaveform(float *denoised,dataStruct *data,photonStruct *photonCount,denPar *den,noisePar *noise)
 {
   int i=0,nPhot=0;
   int bin=0;
+  float minI=0;
   float *temp=NULL;
   float **phots=NULL;
+  void applyShotNoise(float *,int);
 
-  /*allocate space*/
-  temp=falloc(data->nBins,"temp pcl photon",0);
+  #ifdef DEBUG
+  static int count=0;
+  fprintf(stdout,"Photon counting\n");
+  fflush(stdout);
+  #endif
+
+  /*set minimum to zero*/
+  minI=10000.0;
+  for(i=0;i<data->nBins;i++){
+    if(denoised[i]<minI)minI=denoised[i];
+  }
+  temp=falloc(data->nBins,"temp pcl waveform",0);
+  for(i=0;i<data->nBins;i++)temp[i]=denoised[i]-minI;
+
+  /*set window size for background noise photons*/
+  photonCount->H=data->res*(float)data->nBins*2.0;  /*two way distance*/
 
   /*extract photon coords along with their flags*/
-  phots=countPhotons(denoised,data,photonCount,&nPhot,den,noise);
+  phots=countPhotons(temp,data,photonCount,&nPhot,den,noise,1);
+
+  /*reset temp array*/
+  for(i=0;i<data->nBins;i++)temp[i]=0.0;
 
   /*bin up in to new wave*/
   for(i=0;i<nPhot;i++){
     bin=(int)(((float)data->z[0]-phots[0][i])/data->res);
-    temp[bin]+=1.0;
+    if((bin>=0)&&(bin<data->nBins))temp[bin]+=1.0;
   }
   TTIDY((void **)phots,3);
+
+  /*apply shot noise if neeed*/
+  if(noise->shotNoise)applyShotNoise(temp,data->nBins);
+
+  #ifdef DEBUG
+  for(i=0;i<data->nBins;i++)fprintf(stdout,"%d %f %f %f ta\n",count,data->z[i],temp[i],data->wave[0][i]);
+  fflush(stdout);
+  fprintf(stderr,"count %d\n",count);fflush(stderr);
+  count++;
+  #endif
 
   return(temp);
 }/*countWaveform*/
 
 
 /*####################################################*/
-/*count photons*/
+/*apply shot noise*/
 
-float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,int *nPhot,denPar *den,noisePar *noise)
+void applyShotNoise(float *temp,int nBins)
+{
+  int i=0,bin=0;
+  int lostPhots=0;
+  int nCulled=0,totIn=0;
+  float shotSig=0;
+  float shotNoise=0;
+  float photThresh=0;
+  float *mask=NULL;
+
+  /*loop over bins*/
+  for(i=0;i<nBins;i++){
+    /*only if there are photons*/
+    if(temp[i]>TOL){
+      /*set sigma*/
+      shotSig=sqrt(temp[i]);
+
+      /*draw Gaussian random number*/
+      shotNoise=(float)round(GaussNoise()*shotSig);
+
+      /*count truncated negative*/
+      temp[i]+=shotNoise;
+      if(temp[i]<0.0){
+        lostPhots-=(int)(temp[i]+0.5);
+        temp[i]=0.0;
+      }
+
+      totIn+=(int)(temp[i]+0.5);
+    }/*return check*/
+  }/*bin loop*/
+
+  /*redeploy negative numbers*/
+  if(lostPhots>0){
+    if(lostPhots>=totIn){  /*have we lost so many that the signal is empty?*/
+      for(i=0;i<nBins;i++)temp[i]=0.0;
+    }else{                 /*otherwise redeploy negative numbers*/
+      mask=falloc(nBins,"temporary mask",0);
+      nCulled=0;
+
+      while(nCulled<lostPhots){
+        /*make the mask array*/
+        for(i=0;i<nBins;i++){
+          if(temp[i]>0.0)mask[i]=1.0;
+          else           mask[i]=0.0;
+        }
+
+        photThresh=(float)rand()/(float)RAND_MAX;
+        bin=(int)pickArrayElement(photThresh,mask,nBins,0);
+        if(temp[bin]>0.0){
+          temp[bin]-=1.0;
+          nCulled++;
+        }
+      }
+      TIDY(mask);
+    }/*redploy lost photons*/
+  }/*lost photon check*/
+
+  return;
+}/*applyShotNoise*/
+
+
+/*####################################################*/
+/*produce photon counting photons*/
+
+float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,int *nPhot,denPar *den,noisePar *noise,char pcl)
 {
   int i=0;
   int nPhotons=0,nNoise=0;
   int setNumberNoise(float,float,float);
   float **phots=NULL;  /*arrray with z, isSignal and isGround*/
   float photThresh=0,d=0,thisZ=0;
-  float pickArrayElement(float,float *,int,char);
   float photonNoiseIntensity(float);
   float minZ=0,maxZ=0;
   float *thisGr=NULL;
   float *wave=NULL;
   float *adjustPhotonProb(float *,dataStruct *,denPar *,noisePar *,int,photonStruct *);
-  void setPhotonProb(photonStruct *);
+  void knockOffNegativeWaves(float *,dataStruct *);
+  void adjustTotalPhotRate(photonStruct *,float);
   void setPhotonGround(float *,float *,float,double,float *,float *,double *,int);
   char testPhotonGround(dataStruct *,float);
 
+
+  /*remove negatives if needed*/
+  knockOffNegativeWaves(denoised,data);
 
   /*rescale waveform for reflectance*/
   wave=adjustPhotonProb(denoised,data,den,noise,data->useType,photonCount);
 
   /*do we need to set up the probability array?*/
-  if(photonCount->prob==NULL)setPhotonProb(photonCount);
+  if(photonCount->prob==NULL){
+    if(photonCount->reflDiff)adjustTotalPhotRate(photonCount,data->cov);
+    setPhotonProb(photonCount);
+  }
 
   /*choose a number of signal photons to use*/
   photThresh=(float)rand()/(float)RAND_MAX;
-  nPhotons=(int)pickArrayElement(photThresh,photonCount->prob,photonCount->pBins,0);
+  nPhotons=(int)pickArrayElement(photThresh,photonCount->prob,photonCount->pBins,1);
 
   /*generate noise photons*/
-  nNoise=setNumberNoise(data->cov,photonCount->noise_mult,photonCount->H);
+  if(photonCount->noise_mult>TOL)nNoise=setNumberNoise(data->cov,photonCount->noise_mult,photonCount->H);
+  else                           nNoise=0;
   *nPhot=nPhotons+nNoise;
 
   /*allocate space*/
@@ -303,12 +649,26 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
 
   /*Noise*/
   /*set bounds of search window*/
-  if(data->ground)thisGr=data->ground[data->useType];
-  else            thisGr=NULL;
-  setPhotonGround(&minZ,&maxZ,photonCount->H,data->gElev,data->wave[data->useType],thisGr,data->z,data->nBins);
-  thisGr=NULL;
+  if(!pcl){  /*for ICESat-2 mode, set bounds relative to ground*/
+    if(data->ground)thisGr=data->ground[data->useType];
+    else            thisGr=NULL;
+    setPhotonGround(&minZ,&maxZ,photonCount->H,data->gElev,data->wave[data->useType],thisGr,data->z,data->nBins);
+    thisGr=NULL;
+  }else{     /*for PCL mode, set bounds from data*/
+    if(data->z[0]>data->z[data->nBins-1]){
+      maxZ=data->z[0];
+      minZ=data->z[data->nBins-1];
+    }else{
+      minZ=data->z[0];
+      maxZ=data->z[data->nBins-1];
+    }
+  }
 
   /*add noise photons*/
+  #ifdef DEBUG
+  fprintf(stdout,"Adding %d noise over %f signal %d\n",nNoise,photonCount->H,nPhotons);
+  #endif
+
   for(i=0;i<nNoise;i++){
     thisZ=(maxZ-minZ)*((float)rand()/(float)RAND_MAX)+minZ;
 
@@ -317,10 +677,14 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
     phots[2][i+nPhotons]=0.0;     /*is this ground or canopy?*/
   }/*noise loop*/
 
+  /*clear out prob if needed*/
+  if(photonCount->reflDiff)TIDY(photonCount->prob);
+
   /*tidy up*/
   if(wave!=denoised){
     TIDY(wave);
   }else wave=NULL;
+
   return(phots);
 }/*countPhotons*/
 
@@ -346,7 +710,7 @@ void photonCountCloud(float *denoised,dataStruct *data,photonStruct *photonCount
   }
 
   /*generate photons*/
-  phots=countPhotons(denoised,data,photonCount,&nPhot,den,noise);
+  phots=countPhotons(denoised,data,photonCount,&nPhot,den,noise,0);
 
   /*get true RH metrics*/
   rhReal=findRH(data->wave[data->useType],data->z,data->nBins,data->gElev,5.0,&nRH);
@@ -388,6 +752,33 @@ char testPhotonGround(dataStruct *data,float d)
 
 
 /*########################################################*/
+/*remove negative values for photon counting*/
+
+void knockOffNegativeWaves(float *denoised,dataStruct *data)
+{
+  int i=0;
+  float min=0;
+
+  /*find the minimum*/
+  min=100000.0;
+  for(i=0;i<data->nBins;i++){
+    if(denoised[i]<min)min=denoised[i];
+  }
+
+
+  /*translate waves if needed*/
+  if(min<0.0){
+    for(i=0;i<data->nBins;i++){
+      denoised[i]-=min;
+      if(data->ground)data->ground[data->useType][i]-=min;
+    }
+  }
+
+  return;
+}/*knockOffNegativeWaves*/
+
+
+/*########################################################*/
 /*adjust waveform to account for refl difference*/
 
 float *adjustPhotonProb(float *denoised,dataStruct *data,denPar *den,noisePar *noise,int numb,photonStruct *phot)
@@ -399,12 +790,11 @@ float *adjustPhotonProb(float *denoised,dataStruct *data,denPar *den,noisePar *n
 
   /*do we have a ground*/
   if(data->ground==NULL){  /*no ground*/
-    wave=falloc((uint64_t)data->nBins,"rescaled erflectance wave",0);
-    memcpy(wave,data->wave[numb],(size_t)(data->nBins*4));
-  }else{   /*there us a ground*/
+    wave=denoised;
+  }else{   /*there is a ground*/
     /*is any adjustment needed*/
     if(fabs(1.0-phot->rhoVrhoG)<TOL)wave=denoised;
-    else{
+    else{  /*if it is needed, do it*/
       if(den->varNoise||noise->linkNoise){
         fprintf(stderr,"Not able to readjust denoised waveforms just yet\n");
         exit(1);
@@ -412,6 +802,7 @@ float *adjustPhotonProb(float *denoised,dataStruct *data,denPar *den,noisePar *n
         /*find canopy portion*/
         canopy=falloc((uint64_t)data->nBins,"canopy wave",0);
         for(i=0;i<data->nBins;i++)canopy[i]=data->wave[numb][i]-data->ground[numb][i];
+
         /*smooth ground if needed*/
         if((den->sWidth>0.001)||(den->psWidth>0.001)||(den->msWidth>0.001)){
           /*smooth if needed*/
@@ -421,11 +812,12 @@ float *adjustPhotonProb(float *denoised,dataStruct *data,denPar *den,noisePar *n
           smooCan=canopy;
           smooGr=data->ground[numb];
         }
+
         /*add up and normalise*/
         wave=falloc((uint64_t)data->nBins,"rescaled erflectance wave",0);
         tot=0.0;
         for(i=0;i<data->nBins;i++){
-          wave[i]=smooCan[i]*phot->rhoVrhoG+smooGr[i]/phot->rhoVrhoG;
+          wave[i]=smooCan[i]*phot->nPhotC+smooGr[i]*phot->nPhotG;
           tot+=wave[i];
         }
         if(fabs(1.0-tot)>TOL){
@@ -471,11 +863,11 @@ void setPhotonGround(float *minZ,float *maxZ,float H,double gElev,float *wave,fl
       CofG+=(float)z[i]*wave[i];
     }
     CofG/=tot;
-    *maxZ=(float)gElev+H/2.0;
-    *minZ=(float)gElev-H/2.0;
-  }else CofG=gElev;  /*otehrwise use the ground elevation*/
-  *maxZ=(float)CofG+H/2.0;
-  *minZ=(float)CofG-H/2.0;
+    *maxZ=(float)gElev+H/4.0;  /*divided by 4 as H is the 2 way distance*/
+    *minZ=(float)gElev-H/4.0;
+  }else CofG=gElev;  /*otherwise use the ground elevation*/
+  *maxZ=(float)CofG+H/4.0;
+  *minZ=(float)CofG-H/4.0;
 
   return;
 }/*setPhotonGround*/
@@ -487,15 +879,29 @@ void setPhotonGround(float *minZ,float *maxZ,float H,double gElev,float *wave,fl
 int setNumberNoise(float cov,float noise_mult,float H)
 {
   int nNoise=0;
-  float refl=0;
+  /*float refl=0; OLD, for varying reflectance*/
+  float photThresh=0;
   float noiseRate=0;
   float c=299792458.0;
+  photonStruct tempPhot;
 
-  /*surface reflectance*/
-  if((cov<0.0)||(cov>1.0))cov=0.5;
-  refl=cov*0.15+(1.0-cov)*0.22;  /*assuming ground and canopy reflectance values*/
-  noiseRate=noise_mult*refl*pow(10.0,6.0);
-  nNoise=(int)(50.0*(H/c)*noiseRate+0.5);
+  /*is any noise being added?*/
+  if(noise_mult>TOL){
+    /*surface reflectance*/
+    /*if((cov<0.0)||(cov>1.0))cov=0.5;   OLD, for varying ground reflectance
+    refl=cov*0.15+(1.0-cov)*0.22;*/  /*assuming ground and canopy reflectance values*/
+
+    /*noise rate in photons per window*/
+    noiseRate=noise_mult*pow(10.0,6.0); //*refl     used to be *refl to account for xchanging surface reflectance
+    /*nNoise=(int)(50.0*(H/c)*noiseRate+0.5);  This is to match Kaitlin's matlab code, but unsure where the 50 came from*/
+    tempPhot.designval=(H/c)*noiseRate;
+
+    /*pick from a Poisson*/
+    setPhotonProb(&tempPhot);
+    photThresh=(float)rand()/(float)RAND_MAX;
+    nNoise=(int)pickArrayElement(photThresh,tempPhot.prob,tempPhot.pBins,1);
+    TIDY(tempPhot.prob);
+  }else nNoise=0;
 
   return(nNoise);
 }/*setNumberNoise*/
@@ -518,6 +924,17 @@ float photonNoiseIntensity(float cov)
 
   return(noiseInt);
 }/*photonNoiseIntensity*/
+
+
+/*####################################################*/
+/*adjust photon rate for changing reflectance*/
+
+void adjustTotalPhotRate(photonStruct *photonCount,float cov)
+{
+  if(cov>=0.0)photonCount->designval=cov*photonCount->nPhotC+(1.0-cov)*photonCount->nPhotG;
+
+  return;
+}/*adjustTotalPhotRate*/
 
 
 /*####################################################*/
@@ -576,15 +993,32 @@ float pickArrayElement(float photThresh,float *jimlad,int nBins,char interpolate
   }
   photThresh*=tot;
 
-  /*determine point above*/
+  /*determine cross point with binary search*/
   for(i=0;i<nBins;i++)if(cumul[i]>=photThresh)break;
+  //start=0;
+  //end=nBins-1;
+  //while((end-start)>1){
+  //  i=(end+start)/2;
+  //  if(cumul[i]>photThresh)end=i;
+  //  else if(cumul[i]<photThresh)start=i;
+  //  else break;
+  //}
+  //if(cumul[i]>photThresh)i--;  /*get to the right side of the divide*/
+  //if(i<0)i=0;
+  //else if(i>=nBins)i=nBins-1;
 
   /*extrapolate between two elements*/
   if(interpolate){
-    if(i>0)y0=cumul[i-1];
-    else   y0=0.0;
-    if(i<(nBins-1))x=(cumul[i]-photThresh)/(cumul[i]-y0)+(float)i;
-    else           x=(float)(nBins-1);
+    if(fabs(cumul[i]-photThresh)<TOL)x=(float)i;
+    else{
+      if(i>0)y0=cumul[i-1];
+      else   y0=0.0;
+      if(fabs(cumul[i]-y0)<TOL)x=(float)i;
+      else{
+        if(i<(nBins-1))x=(cumul[i]-photThresh)/(cumul[i]-y0)+(float)i;
+        else           x=(float)(nBins-1);
+      }
+    }
   }else x=(float)i;
   TIDY(cumul);
 
@@ -597,11 +1031,33 @@ float pickArrayElement(float photThresh,float *jimlad,int nBins,char interpolate
 
 void setPhotonRates(photonStruct *photonCount)
 {
-  /*do we need to?*/
-  if(photonCount->nPhotG>0.0){
+
+  /*what mode has been used to define photon rates?*/
+  if(fabs(photonCount->rhoVrhoG-1.0)>TOL){                   /*adjusted rhoV/rhoG*/
+    photonCount->nPhotG=2.0*photonCount->designval/photonCount->rhoVrhoG-1.0;
+    photonCount->nPhotC=photonCount->nPhotG*photonCount->rhoVrhoG;
+    photonCount->reflDiff=1;
+    /*prevent negative rates. only needed for black soil etc.*/
+    if(photonCount->nPhotC<0.0)photonCount->nPhotC=0.0;
+    if(photonCount->nPhotG<0.0)photonCount->nPhotG=0.0;
+
+  }else if((photonCount->nPhotG+photonCount->nPhotC)>0.0){   /*separately defined photon rates*/
     photonCount->designval=(photonCount->nPhotC+photonCount->nPhotG)/2.0;
     photonCount->rhoVrhoG=photonCount->nPhotC/photonCount->nPhotG;
+    photonCount->reflDiff=1;
+
+  }else if(fabs(photonCount->designval)<TOL){                /*no reflectance correction. seperate rates*/
+    photonCount->designval=(photonCount->nPhotC+photonCount->nPhotG)/2.0;
+    photonCount->rhoVrhoG=1.0;
+    photonCount->reflDiff=0;
+
+  }else{                                                     /*no reflectance correction. total rate*/
+    photonCount->nPhotG=photonCount->nPhotC=photonCount->designval;
+    photonCount->rhoVrhoG=1.0;
+    photonCount->reflDiff=0;
+
   }
+
   return;
 }/*setPhotonRates*/
 

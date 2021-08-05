@@ -39,6 +39,7 @@ set countOnly=" "
 set pulseAfter=" "
 set decimate=" "
 set seed=" "
+set pcl=" "
 
 
 # read options
@@ -57,7 +58,14 @@ while ($#argv>0)
 
   case -coordList
     set coordList="$argv[2]"
+    @ nCoords=`wc -l < $coordList`
   shift argv;shift argv
+  breaksw
+
+  case -coord
+    set coords="$argv[2] $argv[3]"
+    @ nCoords=1
+  shift argv;shift argv;shift argv
   breaksw
 
   case -pBuff
@@ -197,11 +205,17 @@ while ($#argv>0)
   shift argv;shift argv
   breaksw
 
+  case -pcl
+    set pcl="-pcl"
+  shift argv
+  breaksw
+
   case -help
     echo " "
     echo "-inList name;      name of list with las file names"
     echo "-outRoot root;     output filename root"
     echo "-coordList name;   file containing list of coordinates and waveIDs (x y waveID)"
+    echo "-coord x y;        coordinate of a single footprint to simulate"
     echo "-pBuff size;       RAM buffer size"
     echo "-LVIS;             use LVIS pulse size"
     echo "-pSigma sigma;     pulse width, sigma in m"
@@ -226,6 +240,7 @@ while ($#argv>0)
     echo "-maxPer n;         maximum number of runs per processor"
     echo "-decimate x;       decimate ALS beams by a factor"
     echo "-seed n;           random number seed"
+    echo "-pcl;              will be PCL, so don't pad pulse"
     echo "# octree"
     echo "-noOctree;         do not use an octree"
     echo "-octLevels n;      number of octree levels to use"
@@ -245,12 +260,17 @@ end
 set grabDir="butabe"
 if( ! -e $grabDir )mkdir $grabDir
 
-@ nCoords=`wc -l` < $coordList
 
 # split into sub files
 set tempRoot="/tmp/gediRatList.$$"
 @ nReps=`echo "$nCoords $maxPer"|gawk '{print int($1/$2+1)}'`
-gawk -v maxPer=$maxPer -f $GEDIRAT_ROOT/awk/splitCoords.awk root="$tempRoot" < $coordList
+
+# if in single footprint or group of footprint mode
+if( $nCoords > 1 )then
+  gawk -v maxPer=$maxPer -f $GEDIRAT_ROOT/awk/splitCoords.awk root="$tempRoot" < $coordList
+else
+  echo "$coords" > $tempRoot.0.coords
+endif
 
 @ j=0
 while( $j <= $nReps )
@@ -267,7 +287,7 @@ while( $j <= $nReps )
   if( ! -e $grab )then
     touch $grab
     overlapLasFiles.csh -input $inList -coordList $input -rad 100 -output $temp
-    gediRat -inList $temp -output $output -listCoord $input -pBuff $pBuff $LVIS $pSigma $pFWHM $fSigma $ground $sideLobe $lobeAng $topHat $noNorm $checkCove $maxScanAng $pFile $res $polyGround $hdf $l1b $aEPSG $wavefront $octree $octLevels $nOctPix $countOnly $pulseAfter $decimate $seed 
+    gediRat -inList $temp -output $output -listCoords $input $input -pBuff $pBuff $LVIS $pSigma $pFWHM $fSigma $ground $sideLobe $lobeAng $topHat $noNorm $checkCove $maxScanAng $pFile $res $polyGround $hdf $l1b $aEPSG $wavefront $octree $octLevels $nOctPix $countOnly $pulseAfter $decimate $seed $pcl
 
   endif
 

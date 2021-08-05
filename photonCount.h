@@ -54,6 +54,7 @@ typedef struct{
   float rhoVrhoG;      /*ratio of canopy to ground reflectance for weighting*/
   float nPhotC;        /*mean number of canopy photons per footprint*/
   float nPhotG;        /*mean number of ground photons per footprint*/
+  char reflDiff;       /*are we accounting for a difference in reflectance?*/
   /*noise*/
   float noise_mult;    /*noise scaling factor*/
   float H;             /*search window length, metres*/
@@ -71,8 +72,11 @@ typedef struct{
 
 void setPhotonRates(photonStruct *);
 float *uncompressPhotons(float *,dataStruct *,photonStruct *,noisePar *,gediIOstruct *);
-float **countPhotons(float *,dataStruct *,photonStruct *,int *,denPar *,noisePar *);
+float **countPhotons(float *,dataStruct *,photonStruct *,int *,denPar *,noisePar *,char);
 float *countWaveform(float *,dataStruct *,photonStruct *,denPar *,noisePar *);
+float pickArrayElement(float,float *,int,char);
+void removeAsymmetryPCL(float *,int);
+void setPhotonProb(photonStruct *);
 
 /*###########################################################*/
 

@@ -67,6 +67,9 @@ typedef struct{
   char printNpoint;   /*write number of points to the screen*/
   char charImage;     /*char or float image*/
 
+  /*input filters*/
+  int16_t maxScanAng; /*maximum scan angle*/
+
   /*enforced bounds*/
   char findBounds;    /*find bounds from data switch*/
   double bounds[4];   /*minX, minY, maxX, maxY*/
@@ -412,28 +415,31 @@ void collateImage(control *dimage,lasFile *las,imageStruct *image)
     readLasPoint(las,j);
     setCoords(&x,&y,&z,las);
 
-    xBin=(int)((x-image->minX)/(double)dimage->res+0.5);
-    yBin=(int)((image->maxY-y)/(double)dimage->res+0.5);
+    /*check against filters*/
+    if(abs(las->scanAng)<=dimage->maxScanAng){
+      xBin=(int)((x-image->minX)/(double)dimage->res+0.5);
+      yBin=(int)((image->maxY-y)/(double)dimage->res+0.5);
 
-    if((xBin>=0)&&(xBin<image->nX)&&(yBin>=0)&&(yBin<image->nY)){
-      place=yBin*image->nX+xBin;
-      if(dimage->drawInt)image->jimlad[place]+=(float)las->refl;
-      else if(dimage->drawHeight){
-        if((dimage->onlyGround)&&(las->classif==2))image->jimlad[place]+=(float)z;
-        else if(dimage->onlyGround==0){
-          if(image->minH[place]<-999.0)image->minH[place]=(float)z-image->hRange/2.0;
-          hBin=(int)(((float)z-image->minH[place])/image->hRes+0.5);
-          if((hBin>=0)&&(hBin<image->nHeight))image->heightStack[place][hBin]+=1.0;
-          else fprintf(stderr,"Height bounds not quite wide enough. Point %f bounds %f %f\n",z,image->minH[place],image->minH[place]+image->hRange);
+      if((xBin>=0)&&(xBin<image->nX)&&(yBin>=0)&&(yBin<image->nY)){
+        place=yBin*image->nX+xBin;
+        if(dimage->drawInt)image->jimlad[place]+=(float)las->refl;
+        else if(dimage->drawHeight){
+          if((dimage->onlyGround)&&(las->classif==2))image->jimlad[place]+=(float)z;
+          else if(dimage->onlyGround==0){
+            if(image->minH[place]<-999.0)image->minH[place]=(float)z-image->hRange/2.0;
+            hBin=(int)(((float)z-image->minH[place])/image->hRes+0.5);
+            if((hBin>=0)&&(hBin<image->nHeight))image->heightStack[place][hBin]+=1.0;
+            else fprintf(stderr,"Height bounds not quite wide enough. Point %f bounds %f %f\n",z,image->minH[place],image->minH[place]+image->hRange);
+          }
+        }else if(dimage->drawVegVol)testVegVol(&image->jimlad[place],(float)z,las->refl,dimage,&image->nIn[place],las->classif);
+        if(dimage->findDens&&(las->retNumb==las->nRet))image->nFoot[place]++;
+        if(dimage->drawCov&&(las->classif!=2))image->nCan[place]++;
+
+        if(dimage->drawVegVol==0){
+          if((dimage->onlyGround==0)||(las->classif==2))image->nIn[place]++;
         }
-      }else if(dimage->drawVegVol)testVegVol(&image->jimlad[place],(float)z,las->refl,dimage,&image->nIn[place],las->classif);
-      if(dimage->findDens&&(las->retNumb==las->nRet))image->nFoot[place]++;
-      if(dimage->drawCov&&(las->classif!=2))image->nCan[place]++;
-
-      if(dimage->drawVegVol==0){
-        if((dimage->onlyGround==0)||(las->classif==2))image->nIn[place]++;
       }
-    }
+    }/*filter check*/
   }/*point loop*/
 
   return;
@@ -765,6 +771,9 @@ control *readCommands(int argc,char **argv)
   dimage->bounds[0]=dimage->bounds[1]=1000000000.0;
   dimage->bounds[2]=dimage->bounds[3]=-1000000000.0;
 
+  /*filters*/
+  dimage->maxScanAng=120;
+
   dimage->res=100.0;
   dimage->maxDN=-1.0;
 
@@ -851,8 +860,11 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-maxVint",8)){
         checkArguments(1,i,argc,"-maxVint");
         dimage->maxVint=(uint16_t)atoi(argv[++i]);   
+      }else if(!strncasecmp(argv[i],"-maxScanAng",11)){
+        checkArguments(1,i,argc,"-maxScanAng");
+        dimage->maxScanAng=(int16_t)atoi(argv[++i]);
       }else if(!strncasecmp(argv[i],"-help",5)){
-        fprintf(stdout,"\n#####\nProgram to create GEDI waveforms from ALS las files\n#####\n\n-input name;     lasfile input filename\n-output name;    output filename\n-inList list;    input file list for multiple files\n-res res;        image resolution, in metres\n-bounds minX minY maxX maxY;     user defined image bounds\n-float;          output as float\n-height;         draw height image\n-DTM;            make a bare Earth DEM\n-cover;          draw canopy cover map\n-noInt;          no image\n-findDens;       find point and footprint density\n-epsg n;         geolocation code if not read from file\n-hRange x;       range to expect points over for CHM\n-hThresh x;      percentile threshold to use for CHM in presence of noise\n-writeBound n;   write file bounds to a file\n-pBuff s;        point reading buffer size in Gbytes\n-printNpoint;    print number of points in each file\n\n-vegVol;     draw hedge volume\n-minVh h;\n-maxVh h;\n-maxVint dn;\nQuestions to svenhancock@gmail.com\n\n");
+        fprintf(stdout,"\n#####\nProgram to create GEDI waveforms from ALS las files\n#####\n\n-input name;     lasfile input filename\n-output name;    output filename\n-inList list;    input file list for multiple files\n-res res;        image resolution, in metres\n-bounds minX minY maxX maxY;     user defined image bounds\n-float;          output as float\n-height;         draw height image\n-DTM;            make a bare Earth DEM\n-cover;          draw canopy cover map\n-noInt;          no image\n-findDens;       find point and footprint density\n-epsg n;         geolocation code if not read from file\n-hRange x;       range to expect points over for CHM\n-hThresh x;      percentile threshold to use for CHM in presence of noise\n-writeBound n;   write file bounds to a file\n-pBuff s;        point reading buffer size in Gbytes\n-printNpoint;    print number of points in each file\n\n-vegVol;     draw hedge volume\n-minVh h;\n-maxVh h;\n-maxVint dn;\n-maxScanAng ang;    maximum ALS scan angle to use, in degrees\nQuestions to svenhancock@gmail.com\n\n");
         exit(1);
       }else{
         fprintf(stderr,"%s: unknown argument on command line: %s\nTry gediRat -help\n",argv[0],argv[i]);

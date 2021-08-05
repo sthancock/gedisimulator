@@ -12,6 +12,7 @@
 #include "libOctree.h"
 #include "gediIO.h"
 #include "gediNoise.h"
+#include "time.h"
 
 #define USEPHOTON
 
@@ -91,6 +92,32 @@ typedef struct{
 
 
 /*####################################*/
+/*structure to hold SNR*/
+
+typedef struct{
+  int nWaves;
+  /*false rates*/
+  float falsePosRate;
+  float falseNegRate;
+  /*smoothing widths*/
+  int nSig;
+  float minSig;
+  float maxSig;
+  float dSig;
+  /*min widths*/
+  int nMinWid;
+  int minWid;
+  int maxWid;
+  int dWid;
+  /*array of SNRs*/
+  float ***linkM;   /*link margin per sWidth, per minWidth, per wave*/
+  float ***bSense;  /*beam sensitivity per sWidth, per minWidth, per wave*/
+  float *cov;       /*canopy cover per wave*/
+  float *gWidth;    /*ground width per wave*/
+}snrStruct;
+
+
+/*####################################*/
 /*control structure*/
 
 typedef struct{
@@ -118,8 +145,11 @@ typedef struct{
   char useBounds;    /*when we will process only a subset of bounds*/
   char writeGauss;   /*write Gaussian parameters*/
   char noCanopy;     /*output the FHD and LAI profile switch*/
+  char readPulse;    /*read pulse from an ASCII file*/
   float laiRes;      /*LAI profile resolution*/
   float maxLAIh;     /*maximum height bin of LAI profile. Put all above this in top bin*/
+  char rhNoGround;   /*do not use ground in RH metrics*/
+  char onlySNR;      /*only calculate the SNR*/
 
   /*noise parameters*/
   noisePar noise;  /*noise adding structure*/
@@ -140,13 +170,17 @@ typedef struct{
   /*photon counting*/
   char ice2;         /*ICESat-2 mode. GEDI by default*/
   photonStruct photonCount;  /*photon counting structure*/
-  char pclPhoton;    /*use PCL photon counting*/
+
+  /*SNR structure*/
+  snrStruct *snr;      /*structure to hold SNR*/
 
   /*others*/
-  float rhoRatio; /*ration of canopy to ground reflectance*/
-  float gTol;     /*toleranve used to label ALS ground finding*/
-  float zen;      /*zenith angle*/
-  float fhdHistRes;/*resolution for FHD histogram method*/
+  float rhoRatio;      /*ratio of canopy to ground reflectance, used only for true canopy cover*/
+  float scaleRhoVrhoG; /*this is used to rescale the true waveform*/
+  char changeGrRho;    /*switch to rescale the true waveform*/
+  float gTol;          /*toleranve used to label ALS ground finding*/
+  float zen;           /*zenith angle*/
+  float fhdHistRes;    /*resolution for FHD histogram method*/
 }control;
 
 
@@ -229,7 +263,10 @@ int main(int argc,char **argv)
   void modifyTruth(dataStruct *,noisePar *);
   void checkWaveformBounds(dataStruct *,control *);
   void photonCountCloud(float *,dataStruct *,photonStruct *,char *,int,denPar *,noisePar *);
-  float *processed=NULL,*denoised=NULL;;
+  void calculateSNR(control *,dataStruct *,int);
+  void tidySNR(control *);
+  void writeSNR(char *o,snrStruct *);
+  float *processed=NULL,*denoised=NULL,*pclWave=NULL;
 
   /*read command Line*/
   dimage=readCommands(argc,argv);
@@ -239,9 +276,11 @@ int main(int argc,char **argv)
  
   /*set photon rates if needed*/
   #ifdef USEPHOTON
-  if(dimage->ice2||dimage->pclPhoton)setPhotonRates(&dimage->photonCount);
+  if(dimage->ice2||dimage->gediIO.pclPhoton)setPhotonRates(&dimage->photonCount);
   #endif
 
+  /*read the pulse if needed*/
+  if(dimage->readPulse)setGediPulse(&dimage->gediIO,NULL);
 
   /*allocate metric array*/
   if(!(metric=(metStruct *)calloc(1,sizeof(metStruct)))){
@@ -265,45 +304,66 @@ int main(int argc,char **argv)
 
     /*is the data usable*/
     if(data->usable){
-      /*denoise and change pulse if needed*/
+      /*denoise and change pulse and ground if needed*/
       if(dimage->renoiseWave)modifyTruth(data,&dimage->noise);
+      if(dimage->changeGrRho)modifyGroundRho(data,dimage->scaleRhoVrhoG);
 
       /*determine truths before noising*/
       determineTruth(data,dimage);
 
       /*add noise if needed*/
-      if(!dimage->pclPhoton)addNoise(data,&dimage->noise,dimage->gediIO.fSigma,dimage->gediIO.pSigma,dimage->gediIO.res,rhoC,rhoG);
-      else                  data->noised=uncompressPhotons(data->wave[data->useType],data,&dimage->photonCount,&dimage->noise,&dimage->gediIO);
+      if((!dimage->gediIO.pclPhoton)&&(!dimage->gediIO.photonWave)){
+        addNoise(data,&dimage->noise,dimage->gediIO.fSigma,dimage->gediIO.pSigma,dimage->gediIO.res,rhoC,rhoG);
+        if(dimage->gediIO.pcl)pclWave=data->noised;
+      }else if(dimage->gediIO.photonWave)data->noised=countWaveform(data->wave[data->useType],data,&dimage->photonCount,dimage->gediIO.den,&dimage->noise);
+      else if(dimage->gediIO.pclPhoton)pclWave=data->wave[data->useType];
 
-      /*process waveform*/
-      /*denoise, or*if we are doing PCL on photon counting, convert to photon count*/
-      denoised=processFloWave(data->noised,data->nBins,dimage->gediIO.den,1.0);
 
-      /*check that the wave is still usable*/
-      if(checkUsable(denoised,data->nBins)){
-        /*are we in GEDI mode?*/
-        if(!dimage->ice2){
+      /*do pcl if needed*/
+      if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl)data->noised=uncompressPhotons(pclWave,data,&dimage->photonCount,&dimage->noise,&dimage->gediIO);
+      pclWave=NULL;
 
-          /*Gaussian fit*/
-          if(dimage->noRHgauss==0)processed=processFloWave(denoised,data->nBins,dimage->gediIO.gFit,1.0);
 
-          /*shift Gaussian centres to align to absolute elevation*/
-          alignElevation(data->z[0],data->z[data->nBins-1],dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss);
+      /*do we process or just measure SNR?*/
+      if(!dimage->onlySNR){
+        /*is there any energy*/
+        if(checkUsable(data->noised,data->nBins)){
+          /*process waveform*/
+          /*denoise, or*if we are doing PCL on photon counting, convert to photon count*/
+          denoised=processFloWave(data->noised,data->nBins,dimage->gediIO.den,1.0);
+        }else denoised=NULL;
 
-          /*determine metrics*/
-          findMetrics(metric,dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss,denoised,data->noised,data->nBins,data->z,dimage,data);
+        /*check that the wave is still usable*/
+        if(denoised&&checkUsable(denoised,data->nBins)){
+          /*are we in GEDI mode?*/
+          if(!dimage->ice2){
 
-          /*write results*/
-          if(dimage->readBinLVIS||dimage->readHDFlvis||dimage->readHDFgedi)writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[0]);
-          else                                                             writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[i]);
-        }else{  /*ICESat-2 mode*/
-          photonCountCloud(denoised,data,&dimage->photonCount,dimage->outRoot,i,dimage->gediIO.den,&dimage->noise);
-        }/*operation mode switch*/
-      }else{/*still usable after denoising?*/
-fprintf(stderr,"No longer usable\n");
-      }
+            /*Gaussian fit*/
+            if(dimage->noRHgauss==0)processed=processFloWave(denoised,data->nBins,dimage->gediIO.gFit,1.0);
+
+
+            /*shift Gaussian centres to align to absolute elevation*/
+            alignElevation(data->z[0],data->z[data->nBins-1],dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss);
+
+
+            /*determine metrics*/
+            findMetrics(metric,dimage->gediIO.gFit->gPar,dimage->gediIO.gFit->nGauss,denoised,data->noised,data->nBins,data->z,dimage,data);
+
+
+            /*write results*/
+            if(dimage->readBinLVIS||dimage->readHDFlvis||dimage->readHDFgedi)writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[0]);
+            else                                                             writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[i]);
+
+          }else{  /*ICESat-2 mode*/
+            photonCountCloud(denoised,data,&dimage->photonCount,dimage->outRoot,i,dimage->gediIO.den,&dimage->noise);
+          }/*operation mode switch*/
+        }else{/*still usable after denoising?*/
+          fprintf(stderr,"No longer usable\n");
+        }/*data useable check*/
+      }else{ /*otherwise calculate SNR*/
+        calculateSNR(dimage,data,i);
+      }/*metrics or SNR if*/
     }/*is the data usable*/
-
 
     /*tidy as we go along*/
     TIDY(processed);
@@ -322,7 +382,6 @@ fprintf(stderr,"No longer usable\n");
     }
     TIDY(dimage->gediIO.gFit->gPar);
     TIDY(dimage->gediIO.den->gPar);
-    dimage->gediIO.den->nGauss=0;
     dimage->gediIO.gFit->nGauss=0;
     TIDY(metric->rhMax);
     TIDY(metric->rhInfl);
@@ -344,11 +403,12 @@ fprintf(stderr,"No longer usable\n");
   if(dimage->readBinLVIS)TIDY(dimage->lvis.data);
   if(dimage->readHDFgedi)dimage->hdfGedi=tidyGediHDF(dimage->hdfGedi);
 
-
+  /*write results if needed*/
   if(dimage->writeGauss)fprintf(stdout,"Written to %s.gauss.txt\n",dimage->outRoot);
-  if(!dimage->ice2)fprintf(stdout,"Written to %s.metric.txt\n",dimage->outRoot);
+  if(!dimage->ice2&&!dimage->onlySNR)fprintf(stdout,"Written to %s.metric.txt\n",dimage->outRoot);
+  if(dimage->onlySNR)writeSNR(dimage->outRoot,dimage->snr);
   #ifdef USEPHOTON
-  else             fprintf(stdout,"Written to %s\n",dimage->photonCount.outNamen);
+  if(dimage->ice2)fprintf(stdout,"Written to %s\n",dimage->photonCount.outNamen);
   #endif
 
 
@@ -356,6 +416,7 @@ fprintf(stderr,"No longer usable\n");
   tidySMoothPulse();
   TIDY(metric);
   if(dimage){
+    if(dimage->snr)tidySNR(dimage);
     if(dimage->lvisL2){
       TIDY(dimage->lvisL2->lfid);
       TIDY(dimage->lvisL2->shotN);
@@ -377,6 +438,19 @@ fprintf(stderr,"No longer usable\n");
       fclose(dimage->opooGauss);
       dimage->opooGauss=NULL;
     }
+    if(dimage->gediIO.pulse){
+      TIDY(dimage->gediIO.pulse->x);
+      TIDY(dimage->gediIO.pulse->y);
+      if(dimage->gediIO.pulse->pclSmoo!=dimage->gediIO.pulse->resamp)TIDY(dimage->gediIO.pulse->pclSmoo);
+      TIDY(dimage->gediIO.pulse->resamp);
+      TIDY(dimage->gediIO.pulse);
+    }
+    if(dimage->gediIO.hannFilt){
+      TIDY(dimage->gediIO.hannFilt->x);
+      TIDY(dimage->gediIO.hannFilt->y);
+      TIDY(dimage->gediIO.hannFilt);
+    }
+    dimage->gediIO.den->nGauss=0;
     #ifdef USEPHOTON
     if(dimage->photonCount.opoo){
       fclose(dimage->photonCount.opoo);
@@ -399,6 +473,453 @@ fprintf(stderr,"No longer usable\n");
   }
   return(0);
 }/*main*/
+
+
+/*####################################################*/
+/*write SNR results*/
+
+void writeSNR(char *outRoot,snrStruct *snr)
+{
+  int i=0,j=0,k=0;
+  int wid=0;
+  float sig=0;
+  char namen[200];
+  FILE *opoo=NULL;
+
+  /*open file*/
+  sprintf(namen,"%s.snr.txt",outRoot);
+  if((opoo=fopen(namen,"w"))==NULL){
+    fprintf(stderr,"Error opening output file %s\n",namen);
+    exit(1);
+  }
+
+  /*write header*/
+  fprintf(opoo,"# 1 cov, 2 gWidth, 3 sWidth, 4 minWidth, 5 linkM, 6 beamSense\n");
+
+  /*loop over waves*/
+  for(k=0;k<snr->nWaves;k++){
+    for(j=0;j<snr->nSig;j++){
+      sig=(float)j*snr->dSig+snr->minSig;
+      for(i=0;i<snr->nMinWid;i++){
+        wid=i*snr->dWid+snr->minWid;
+        fprintf(opoo,"%f %f %f %d %f %f\n",snr->cov[k],snr->gWidth[k],sig,wid,snr->linkM[i][j][k],snr->bSense[i][j][k]);
+      }
+    }
+  }
+
+  /*close up*/
+  if(opoo){
+    fclose(opoo);
+    opoo=NULL;
+  }
+  fprintf(stdout,"Written to %s\n",namen);
+
+  return;
+}/*writeSNR*/
+
+
+/*####################################################*/
+/*calculate SNR*/
+
+void calculateSNR(control *dimage,dataStruct *data,int numb)
+{
+  int i=0,j=0,minWidth=0;
+  int eBin=0,sBin=0;
+  int histBins=0;
+  float sWidth=0,gWidth=0;
+  float *smoothed=NULL,meanNoise=0;
+  float *smooGr=NULL,hOffset=0;
+  float falsePosThresh=0,falseNegThresh=0;
+  float snrMeanNoise(float *,int,float,int *,int *);
+  float *snrNoiseHist(float *,int,float,int,int,int *,int,float *,float *,float *,dataStruct *);
+  float *noiseHist=NULL,minHist=0,maxHist=0,histRes=0;
+  float snrPosThresh(float *,float,float,int,float,float);
+  float snrNegThresh(float *,float,float,int,float,float,float,float,float *);
+  float snrBeamSense(float,float,float,float *,int,float,float,float *,float,float);
+  float snrLinkMarginPCL(float,float,float,float,float,float *,int,float);
+  float snrLinkMargin(float,float *,float,int,dataStruct *);
+  void allocateSNR(control *);
+
+  /*allocate if needed*/
+  if(dimage->snr==NULL)allocateSNR(dimage);
+
+  /*save covers and widths*/
+  dimage->snr->cov[numb]=data->cov;
+  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl)dimage->snr->gWidth[numb]=(0.15>data->res)?0.15:data->res;
+  else                                            dimage->snr->gWidth[numb]=data->gStdev;
+
+  /*loop over smoothing widths*/
+  for(j=0;j<dimage->snr->nSig;j++){
+    sWidth=(float)j*dimage->snr->dSig+dimage->snr->minSig;
+
+    /*smooth waveform*/
+    smoothed=smooth(sWidth,data->nBins,data->noised,data->res);
+    if(!dimage->gediIO.pclPhoton&&!dimage->gediIO.pcl)smooGr=smooth(sWidth,data->nBins,data->ground[data->useType],data->res);
+
+    /*find ground properties, accounting fdor any smoothing*/
+    gWidth=sqrt(dimage->snr->gWidth[numb]*dimage->snr->gWidth[numb]+sWidth*sWidth+dimage->gediIO.pclSwidth*dimage->gediIO.pclSwidth+\
+                dimage->gediIO.hannWidth*dimage->gediIO.hannWidth*data->res*data->res/16.0);
+
+    /*find mean noise*/
+    meanNoise=snrMeanNoise(smoothed,data->nBins,data->res,&sBin,&eBin);
+
+    /*loop over minimum widths*/
+    for(i=0;i<dimage->snr->nMinWid;i++){
+      minWidth=i*dimage->snr->dWid+dimage->snr->minWid;
+
+      /*find statistics for a given width*/
+      noiseHist=snrNoiseHist(smoothed,data->nBins,meanNoise,eBin,sBin,&histBins,minWidth,&minHist,&maxHist,&histRes,data);
+
+      /*find failure prob threshold*/
+      falsePosThresh=snrPosThresh(noiseHist,minHist,histRes,histBins,dimage->snr->falsePosRate,data->res);
+      falseNegThresh=snrNegThresh(noiseHist,minHist,histRes,histBins,dimage->snr->falseNegRate,data->res*(float)minWidth,gWidth,meanNoise,&hOffset);
+
+      /*link margin and beam sense from ground amplitude*/
+      if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*using PCL, use assumed width*/
+        dimage->snr->linkM[i][j][numb]=snrLinkMarginPCL(falsePosThresh,falseNegThresh,meanNoise,gWidth,data->cov,data->wave[data->useType],data->nBins,data->res);
+      }else{
+        dimage->snr->linkM[i][j][numb]=snrLinkMargin(falsePosThresh,smooGr,meanNoise,data->nBins,data);
+      }
+
+     /*beam sense from ground amplitude*/
+     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise,data->noised,dimage->rhoRatio,hOffset);
+
+      TIDY(noiseHist);
+    }/*min width loop*/
+
+    TIDY(smoothed);
+    TIDY(smooGr);
+  }/*smoothing width loop*/
+
+  return;
+}/*calculateSNR*/
+
+
+/*####################################################*/
+/*find the link margin for SNR for PCL*/
+
+float snrLinkMarginPCL(float falsePosThresh,float falseNegThresh,float meanNoise,float gWidth,float cov,float *wave,int nBins,float res)
+{
+  int i=0;
+  float linkM=0;
+  float gAmp=0,totE=0;
+
+  /*find total energy*/
+  totE=0.0;
+  for(i=0;i<nBins;i++)totE+=wave[i];
+  totE-=(float)nBins*meanNoise;
+  totE*=res;
+
+  /*find hypothetical ground amplitude*/
+  gAmp=totE*(1.0-cov)/(gWidth*sqrt(2.0*M_PI));
+  linkM=10.0*log10(gAmp/(falseNegThresh+falsePosThresh-meanNoise));
+
+  return(linkM);
+}/*snrLinkMarginPCL*/
+
+
+/*####################################################*/
+/*find the link margin for SNR*/
+
+float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins,dataStruct *data)
+{
+  int i=0;
+  float linkM=0,maxGr=0;
+  float totN=0.0,totE=0.0;
+
+  /*find peak ground and total energies for scaling*/
+  maxGr=-1000.0;
+  for(i=0;i<nBins;i++){
+    if(smooGr[i]>maxGr)maxGr=smooGr[i];
+    totN+=data->noised[i];
+    totE+=data->wave[data->useType][i];
+  }
+  totN-=meanNoise*(float)nBins;
+  totN*=data->res;
+  totE*=data->res;
+
+  /*scale to match threshold*/
+  maxGr*=totN/totE;
+
+  /*find link margin*/
+  linkM=10.0*log10(maxGr/(falsePosThresh-meanNoise));
+
+  return(linkM);
+}/*snrLinkMargin*/
+
+
+/*####################################################*/
+/*find beam sensitivity for SNR*/
+
+float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,float rhoRatio,float hOffset)
+{
+  int i=0;
+  float gInt=0,totN=0.0,cInt=0;
+  float bSense=0,A=0;
+
+  /*find integral*/
+  totN=0.0;
+  for(i=0;i<nBins;i++)totN+=noised[i];
+  totN-=(float)nBins*meanNoise;
+  totN*=res;
+
+  /*integral for threshold*/
+  A=(falseNegThresh+falsePosThresh-meanNoise)/hOffset;
+  gInt=A*gWidth*sqrt(2.0*M_PI);  /*not sure where the 2.0 comes from??*/
+  cInt=totN-gInt;
+  bSense=cInt/(cInt+gInt*rhoRatio);
+
+  /*fprintf(stdout,"%f %f %f %f %f %f\n",A,totN,gWidth,bSense,meanNoise,gInt);*/
+
+  return(bSense);
+}/*snrBeamSense*/
+
+
+/*####################################################*/
+/*find failure prob threshold*/
+
+float snrNegThresh(float *noiseHist,float minHist,float histRes,int histBins,float falseNegRate,float minWidth,float gWidth,float meanNoise,float *hOffset)
+{
+  int i=0;
+  float max=0;
+  float falseNegThresh=0;
+
+  /*find maximum*/
+  max=-1000.0;
+  for(i=0;i<histBins;i++){
+    if(noiseHist[i]>max)max=noiseHist[i];
+  }
+
+  /*find difference between min width and peak*/
+  *hOffset=gaussian((double)minWidth/2.0,(double)gWidth,0.0)*gWidth*sqrt(2.0*M_PI);;
+
+  /*find the threshold*/
+  for(i=0;i<histBins;i++){
+    if((noiseHist[i]/max)>=(1.0-falseNegRate)){
+      falseNegThresh=meanNoise-((float)i*histRes+minHist);
+      break;
+    }
+  }
+
+  return(falseNegThresh);
+}/*snrNegThresh*/
+
+
+/*####################################################*/
+/*find failure prob threshold*/
+
+float snrPosThresh(float *noiseHist,float minHist,float histRes,int histBins,float falsePosRate,float res)
+{
+  int i=0;
+  float max=0;
+  float falsePosThresh=0;
+
+  /*find maximum*/
+  max=-1000.0;
+  for(i=0;i<histBins;i++){
+    if(noiseHist[i]>max)max=noiseHist[i];
+  }
+
+  /*find the threshold*/
+  for(i=histBins-1;i>=0;i--){
+    if(((30.0/res)*noiseHist[i]/max)>=falsePosRate){
+      falsePosThresh=(float)i*histRes+minHist;
+      break;
+    }
+  }
+
+  return(falsePosThresh);
+}/*snrPosThresh*/
+
+
+/*####################################################*/
+/*find noise histogram for given minWidth*/
+
+float *snrNoiseHist(float *smoothed,int nBins,float meanNoise,int eBin,int sBin,int *histBins,int minWidth,float *minHist,float *maxHist,float *histRes,dataStruct *data)
+{
+  int i=0;
+  float *noiseHist=NULL;
+  void populateSNRhist(float *,int,int,float *,float *,float *,int *,int,float *);
+
+  /*find min/max*/
+  *minHist=100000.0;
+  *maxHist=-100000;
+  for(i=0;i<sBin;i++){
+    if(smoothed[i]<*minHist)*minHist=smoothed[i];
+    if(smoothed[i]>*maxHist)*maxHist=smoothed[i];
+  }
+  for(i=eBin;i<nBins;i++){
+    if(smoothed[i]<*minHist)*minHist=smoothed[i];
+    if(smoothed[i]>*maxHist)*maxHist=smoothed[i];
+  }
+
+  /*allocate histogram*/
+  *histRes=(*maxHist-*minHist)/pow(2.0,12.0);
+  if(*histRes<=0.0)*histRes=TOL;
+  *histBins=(int)((*maxHist-*minHist)/(*histRes)+1.0);
+  if(*histBins<=0)*histBins=1;
+  noiseHist=falloc(*histBins,"noiseHist",0);
+
+  /*populate histogram*/
+  populateSNRhist(smoothed,0,sBin,noiseHist,minHist,maxHist,histBins,minWidth,histRes);
+  populateSNRhist(smoothed,eBin,nBins,noiseHist,minHist,maxHist,histBins,minWidth,histRes);
+
+  return(noiseHist);
+}/*snrNoiseHist*/
+
+
+/*####################################################*/
+/*populate histogram*/
+
+void populateSNRhist(float *wave,int sBin,int eBin,float *noiseHist,float *minHist,float *maxHist,int *histBins,int minWidth,float *histRes)
+{
+  int i=0,j=0,l=0;
+  int totLen=0;
+  float thresh=0;
+
+  /*loop over noise levels*/
+  for(j=0;j<*histBins;j++){
+    thresh=*minHist+(float)j*(*histRes);
+
+    l=totLen=0;
+    for(i=sBin;i<eBin;i++){
+
+      if(wave[i]>=thresh)l++;
+      else if((wave[i]<thresh)&&(l>0)){
+        if(l>=minWidth)totLen+=l;
+        l=0;
+      }
+    }/*bin loop */
+
+    /*in case we're still in a feature*/
+    if(l>=minWidth)totLen+=l;
+
+    /*add to histogram*/
+    noiseHist[j]+=(float)totLen/((float)(eBin-sBin)*2.0);  /*multipled 2 as we're doing the start and end*/
+  }/*threshold loop*/
+
+  return;
+}/*populateSNRhist*/
+
+
+/*####################################################*/
+/*find background noise for SNR calculation*/
+
+float snrMeanNoise(float *smoothed,int nBins,float res,int *sBin,int *eBin)
+{
+  int i=0;
+  float meanNoise=0.0;
+  float buff=0;
+
+  *sBin=*eBin=-1;
+
+  /*buffer from start and end for signal to noise*/
+  buff=20.0;
+  *sBin=(int)(buff/res);
+  *eBin=nBins-(int)(buff/res);
+
+  /*find mean*/
+  for(i=0;i<*sBin;i++)meanNoise+=smoothed[i];
+  for(i=*eBin;i<nBins;i++)meanNoise+=smoothed[i];
+
+  /*normalise*/
+  if((*eBin+*sBin)>0)meanNoise/=(float)((*sBin)+(nBins-(*eBin)));
+
+  return(meanNoise);
+}/*snrMeanNoise*/
+
+
+/*####################################################*/
+/*free SNR structure*/
+
+void tidySNR(control *dimage)
+{
+  int i=0,j=0;
+
+  if(dimage->snr->linkM){
+    for(i=0;i<dimage->snr->nMinWid;i++){
+      for(j=0;j<dimage->snr->nSig;j++){
+        TIDY(dimage->snr->linkM[i][j]);
+      }
+      TIDY(dimage->snr->linkM[i]);
+    }
+    TIDY(dimage->snr->linkM);
+  }
+  if(dimage->snr->bSense){
+    for(i=0;i<dimage->snr->nMinWid;i++){
+      for(j=0;j<dimage->snr->nSig;j++){
+        TIDY(dimage->snr->bSense[i][j]);
+      }
+      TIDY(dimage->snr->bSense[i]);
+    }
+    TIDY(dimage->snr->bSense);
+  }
+  TIDY(dimage->snr->cov);
+  TIDY(dimage->snr->gWidth);
+
+  TIDY(dimage->snr);
+
+  return;
+}/*tidySNR*/
+
+
+/*####################################################*/
+/*allocate SNR structure*/
+
+void allocateSNR(control *dimage)
+{
+  int i=0,j=0;
+
+  if(!(dimage->snr=(snrStruct *)calloc(1,sizeof(snrStruct)))){
+    fprintf(stderr,"error in snrStruct allocation.\n");
+    exit(1);
+  }
+
+  /*false rates*/
+  dimage->snr->falsePosRate=0.05;
+  dimage->snr->falseNegRate=0.1;
+
+
+  /*smoothing widths*/
+  dimage->snr->minSig=0.0;
+  dimage->snr->maxSig=2.5;
+  dimage->snr->dSig=0.2;
+  dimage->snr->nSig=(int)((dimage->snr->maxSig-dimage->snr->minSig)/dimage->snr->dSig+1.0);
+
+  /*min widths*/
+  dimage->snr->minWid=1;
+  dimage->snr->maxWid=9;
+  dimage->snr->dWid=2;
+  dimage->snr->nMinWid=(dimage->snr->maxWid-dimage->snr->minWid)/dimage->snr->dWid+1;
+
+  /*waveforms*/
+  dimage->snr->nWaves=dimage->gediIO.nFiles;
+
+  /*allocate SNRs*/
+  if(!(dimage->snr->linkM=(float ***)calloc(dimage->snr->nMinWid,sizeof(float **)))){
+    fprintf(stderr,"error in snr linkM allocation.\n");
+    exit(1);
+  }
+  if(!(dimage->snr->bSense=(float ***)calloc(dimage->snr->nMinWid,sizeof(float **)))){
+    fprintf(stderr,"error in snr bSense allocation.\n");
+    exit(1);
+  }
+
+  for(i=0;i<dimage->snr->nMinWid;i++){
+    dimage->snr->linkM[i]=fFalloc(dimage->snr->nSig,"snr linkM",i+1);
+    dimage->snr->bSense[i]=fFalloc(dimage->snr->nSig,"snr bSense",i+1);
+
+    for(j=0;j<dimage->snr->nSig;j++){
+      dimage->snr->linkM[i][j]=falloc(dimage->snr->nWaves,"snr linkM",j+1);
+      dimage->snr->bSense[i][j]=falloc(dimage->snr->nWaves,"snr bSense",j+1);
+    }
+  }
+
+  dimage->snr->cov=falloc(dimage->snr->nWaves,"snr cov",0);
+  dimage->snr->gWidth=falloc(dimage->snr->nWaves,"snr gWidth",0);
+
+  return;
+}/*allocateSNR*/
 
 
 /*####################################################*/
@@ -435,27 +956,43 @@ void checkWaveformBounds(dataStruct *data,control *dimage)
 void determineTruth(dataStruct *data,control *dimage)
 {
   int i=0;
-  float totE=0,cumul=0;
+  float totE=0,cumul=0,meanG=0;
   float groundOverlap(float *,float *,int);
   float groundMinAmp(float *,float *,int);
   float groundInflection(float *,float *,int);
+  float *matchedGr=NULL;
 
   /*determine ground*/
+  /*apply matched filter to remove assymmetry*/
+
+  /*find the ground*/
   if(!data->demGround){  /*unless it's already been calculalated from the DEM*/
     if(dimage->gediIO.ground){
+      if(dimage->gediIO.pulse)matchedGr=matchedFilter(data->ground[data->useType],data->nBins,dimage->gediIO.den,data->res);
+      else                    matchedGr=data->ground[data->useType];
+
+      /*find CofG*/
       totE=0.0;
-      data->gElev=0.0;
+      data->gElev=meanG=0.0;
       for(i=0;i<data->nBins;i++){
         totE+=data->ground[data->useType][i];
-        data->gElev+=(double)data->ground[data->useType][i]*data->z[i];
+        data->gElev+=(double)matchedGr[i]*data->z[i];
+        meanG+=(double)data->ground[data->useType][i]*data->z[i];
       }
-      if(totE>0.0)data->gElev/=(double)totE;
-      else        data->gElev=-1000000.0;
+
+      if(matchedGr!=data->ground[data->useType]){
+        TIDY(matchedGr);
+      }
+
+      if(totE>0.0){
+        data->gElev/=(double)totE;
+        meanG/=(double)totE;
+      }else data->gElev=meanG=-1000000.0;
 
       /*standard deviation as a measure of slope*/
       data->gStdev=0.0;
       for(i=0;i<data->nBins;i++){
-        data->gStdev+=(float)((data->z[i]-data->gElev)*(data->z[i]-data->gElev))*data->ground[data->useType][i];
+        data->gStdev+=(float)((data->z[i]-meanG)*(data->z[i]-meanG))*data->ground[data->useType][i];
       }
       if(totE>0.0){
         data->gStdev=sqrt(data->gStdev/totE);
@@ -790,7 +1327,7 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   double inflGround(float *,double *,int);
   double bayesGround(float *,int,control *,metStruct *,double *,dataStruct *);
   float *blankRH(float,int *);
-  float *smoothed=NULL,*canWave=NULL;
+  float *smoothed=NULL,*canProf=NULL,*canWave=NULL;
   float halfCover(float *,double *,int,double,float);
   void findSignalBounds(float *,double *,int,double *,double *,control *);
   void findWaveExtents(float *,double *,int,double,double,float *,float *);
@@ -837,8 +1374,14 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   den.noiseTrack=0;
   smoothed=processFloWave(denoised,nBins,&den,1.0);
 
+  /*true canopy if needed*/
+  if((dimage->noCanopy==0)||(dimage->rhNoGround)){
+    /*from ground removed canopy*/
+  }
+
+
   /*ground by Gaussian fit*/
-  if(dimage->noRHgauss==0)metric->gHeight=gaussianGround(energy,mu,sig,&gInd,nGauss,tot,&metric->gSlope,data,dimage->gediIO.den);
+  if((dimage->noRHgauss==0)&&(nGauss>0))metric->gHeight=gaussianGround(energy,mu,sig,&gInd,nGauss,tot,&metric->gSlope,data,dimage->gediIO.den);
   else                    metric->gHeight=metric->gSlope=-1.0;
 
   /*canopy cover*/
@@ -851,7 +1394,7 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   metric->inflGround=inflGround(smoothed,z,nBins);
 
   /*rh metrics with Gaussian ground*/
-  if(dimage->noRHgauss==0)metric->rh=findRH(denoised,z,nBins,metric->gHeight,dimage->rhRes,&metric->nRH);
+  if((dimage->noRHgauss==0)&&(nGauss>0))metric->rh=findRH(denoised,z,nBins,metric->gHeight,dimage->rhRes,&metric->nRH);
   else                    metric->rh=blankRH(dimage->rhRes,&metric->nRH);
 
   /*rh metrics with maximum ground*/
@@ -862,8 +1405,14 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
 
   /*rh metrics with real ground, if we have the ground*/
   if(dimage->gediIO.ground||data->demGround){
-    if(dimage->noise.linkNoise)metric->rhReal=findRH(data->wave[data->useType],z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*original was noiseless*/
-    else                 metric->rhReal=findRH(denoised,z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*origina was noisy*/
+    if(!dimage->rhNoGround){
+      if(dimage->noise.linkNoise)metric->rhReal=findRH(data->wave[data->useType],z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*original was noiseless*/
+      else                       metric->rhReal=findRH(denoised,z,nBins,data->gElev,dimage->rhRes,&metric->nRH);  /*origina was noisy*/
+    }else{
+      canWave=subtractGroundFromCan(data->wave[data->useType],data->ground[data->useType],nBins);
+      metric->rhReal=findRH(canWave,z,nBins,data->gElev,dimage->rhRes,&metric->nRH);   /*canopy only*/
+      TIDY(canWave);
+    }
   }else{
     metric->rhReal=falloc((uint64_t)metric->nRH,"rhReal",0);
     for(i=0;i<metric->nRH;i++)metric->rhReal[i]=-1.0;
@@ -872,18 +1421,17 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   /*foliage height diversity*/
   metric->FHD=foliageHeightDiversity(denoised,nBins);
   if(dimage->noCanopy==0){   /*more complex ones only if needed*/
+    if(dimage->gediIO.ground)canProf=canProfile(data->wave[data->useType],data->ground[data->useType],nBins);
+    else                     canProf=NULL;  /*no ground estimate. Leave blank*/
     metric->FHDhist=foliageHeightDiversityHist(denoised,nBins,dimage->fhdHistRes);
-    /*from ground removed canopy*/
-    if(dimage->gediIO.ground)canWave=subtractGroundFromCan(data->wave[data->useType],data->ground[data->useType],nBins);
-    else                     canWave=NULL;  /*no ground estimate. Leave blank*/
-    metric->FHDcanH=foliageHeightDiversityHist(canWave,nBins,dimage->fhdHistRes);
-    TIDY(canWave);
+    metric->FHDcanH=foliageHeightDiversityHist(canProf,nBins,dimage->fhdHistRes);
+    TIDY(canProf);
     /*from Gaussian removed canopy*/
-    if(nGauss>0)canWave=subtractGaussFromCan(denoised,nBins,mu[gInd],A[gInd],sig[gInd],z);
-    else        canWave=NULL;  /*no Gaussian ground estimate*/
-    metric->FHDcanGauss=foliageHeightDiversity(canWave,nBins);
-    metric->FHDcanGhist=foliageHeightDiversityHist(canWave,nBins,dimage->fhdHistRes);
-    TIDY(canWave);
+    if(nGauss>0)canProf=subtractGaussFromCan(denoised,nBins,mu[gInd],A[gInd],sig[gInd],z);
+    else        canProf=NULL;  /*no Gaussian ground estimate*/
+    metric->FHDcanGauss=foliageHeightDiversity(canProf,nBins);
+    metric->FHDcanGhist=foliageHeightDiversityHist(canProf,nBins,dimage->fhdHistRes);
+    TIDY(canProf);
   }
 
   /*lai profiles*/
@@ -899,7 +1447,6 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
     metric->hiLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->inflGround,dimage->maxLAIh,&metric->laiBins);
     metric->hmLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->maxGround,dimage->maxLAIh,&metric->laiBins);
   }
-
 
   /*signal start and end*/
   findSignalBounds(denoised,z,nBins,&metric->tElev,&metric->bElev,dimage);
@@ -1409,6 +1956,10 @@ double gaussianGround(float *energy,float *mu,float *sig,int *gInd,int nGauss,fl
     }
   }
 
+  if(sig==NULL){
+    fprintf(stderr,"No signal\n");
+  }
+
   /*determine slope*/
   baseSig=sqrt(data->pSigma*data->pSigma+den->sWidth*den->sWidth+den->psWidth*den->psWidth+den->msWidth+den->msWidth);
   if(sig[*gInd]>baseSig)*slope=atan2(sqrt(sig[*gInd]*sig[*gInd]-baseSig*baseSig),data->fSigma)*180.0/M_PI;
@@ -1628,11 +2179,15 @@ void photonCountCloud(float *denoised,dataStruct *data,photonStruct *photonCount
 
 control *readCommands(int argc,char **argv)
 {
-  int i=0;
+  int i=0,j=0;
   control *dimage=NULL;
   void setDenoiseDefault(denPar *);
   void readPulse(denPar *);
   void writeHelp();
+
+  /*by default, set the seed as time. Can be overridden later*/
+  srand((long)time(NULL));
+  for(j=(int)(time(NULL)%50);j>=0;j--)rand();
 
   /*allocate structures*/
   if(!(dimage=(control *)calloc(1,sizeof(control)))){
@@ -1662,6 +2217,7 @@ control *readCommands(int argc,char **argv)
   dimage->hdfGedi=NULL;
   dimage->gediIO.useBeam[0]=dimage->gediIO.useBeam[1]=dimage->gediIO.useBeam[2]=dimage->gediIO.useBeam[3]=\
     dimage->gediIO.useBeam[4]=dimage->gediIO.useBeam[5]=dimage->gediIO.useBeam[6]=dimage->gediIO.useBeam[7]=1;    /*read all waves*/
+  dimage->gediIO.pulse=NULL;
 
   /*scan settings*/
   dimage->gediIO.pSigma=0.764331; /*pulse length*/
@@ -1681,6 +2237,7 @@ control *readCommands(int argc,char **argv)
   dimage->bayesGround=0;
   dimage->noise.missGround=0;
   dimage->noise.linkNoise=0;
+  dimage->noise.shotNoise=0;
   dimage->noise.driftFact=0.0;
   dimage->gediIO.linkPsig=dimage->gediIO.pSigma; /*pulse length*/
   dimage->gediIO.linkFsig=5.5;      /*footprint width*/
@@ -1700,6 +2257,10 @@ control *readCommands(int argc,char **argv)
   dimage->coord2dp=1;         /*round up coords in output*/
   dimage->useBounds=0;        /*process all data provided*/
   dimage->writeGauss=0;       /*do not write Gaussian parameters*/
+  dimage->readPulse=0;        /*don't read a pulse*/
+  dimage->rhNoGround=0;       /*do include the ground in RH metrics*/
+  dimage->onlySNR=0;          /*don't just measure SNR*/
+  dimage->snr=NULL;
 
   /*set default denoising parameters*/
   setDenoiseDefault(dimage->gediIO.den);
@@ -1745,23 +2306,32 @@ control *readCommands(int argc,char **argv)
   dimage->readL2=0;   /*do not read L2*/
   /*photon counting*/
   dimage->ice2=0;             /*GEDI mode, rather than ICESat-2*/
-  dimage->pclPhoton=0;        /*full waveform rather thsn PCL*/
+  dimage->gediIO.photonWave=0;
   #ifdef USEPHOTON
   dimage->photonCount.designval=2.1;
   dimage->photonCount.prob=NULL;
   dimage->photonCount.pBins=0;
-  dimage->photonCount.H=200.0;
-  dimage->photonCount.nPhotC=dimage->photonCount.designval;
-  dimage->photonCount.nPhotG=-1.0;     /*blank number*/
-  dimage->photonCount.noise_mult=0.1;
+  dimage->photonCount.H=200.0;   /*this is thew two way distance, so a 100 m window, halved later*/
+  dimage->photonCount.nPhotC=dimage->photonCount.nPhotG=-1.0;     /*blank number*/
+  dimage->photonCount.reflDiff=0;      /*no reflectance difference*/
+  dimage->photonCount.noise_mult=0.0;
   dimage->photonCount.rhoVrhoG=1.0;
   dimage->photonCount.writeHDF=0;  /*write ASCII by default*/
   dimage->photonCount.hdf=NULL;
   #endif
+  /*PCL*/
+  dimage->gediIO.pcl=0; /*full waveform rather thsn PCL*/
+  dimage->gediIO.pclPhoton=0;  
+  dimage->gediIO.writePcl=0;
+  dimage->gediIO.pclSwidth=0.0;  /*don't pre-smooth before PCL*/
+  dimage->gediIO.hannWidth=0.0;
+  dimage->gediIO.hannFilt=NULL;  /*no Hann filter*/
   /*others*/
-  rhoG=0.4;
-  rhoC=0.57;
-  dimage->rhoRatio=rhoC/rhoG;
+  rhoG=0.4;                   /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
+  rhoC=0.57;                  /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
+  dimage->rhoRatio=rhoC/rhoG; /*these are used only for estimating true cover*/
+  dimage->scaleRhoVrhoG=1.0;  /*this is used to rescale the true waveform*/
+  dimage->changeGrRho=0;      /*do not rescale the true waveform*/
   dimage->gTol=0.0;
   dimage->gediIO.nMessages=200;
   dimage->fhdHistRes=0.001;
@@ -1775,8 +2345,8 @@ control *readCommands(int argc,char **argv)
         dimage->gediIO.inList=NULL;
         dimage->gediIO.nFiles=1;
         dimage->gediIO.inList=chChalloc(dimage->gediIO.nFiles,"input name list",0);
-        dimage->gediIO.inList[0]=challoc((uint64_t)strlen(argv[++i])+1,"input name list",0);
-        strcpy(dimage->gediIO.inList[0],argv[i]);
+        dimage->gediIO.inList[0]=challoc((uint64_t)strlen(argv[++i])+10,"input name list",0);
+        strcpy(&(dimage->gediIO.inList[0][0]),argv[i]);
       }else if(!strncasecmp(argv[i],"-inList",7)){
         checkArguments(1,i,argc,"-inList");
         TTIDY((void **)dimage->gediIO.inList,dimage->gediIO.nFiles);
@@ -1804,6 +2374,7 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-seed",5)){
         checkArguments(1,i,argc,"-seed");
         srand(atoi(argv[++i]));
+        for(j=rand()%50;j>=0;j--)rand();
       }else if(!strncasecmp(argv[i],"-meanN",5)){
         checkArguments(1,i,argc,"-meanN");
         dimage->gediIO.den->meanN=atof(argv[++i]);
@@ -1841,12 +2412,18 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-varScale");
         dimage->gediIO.den->varNoise=1;
         dimage->gediIO.den->threshScale=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-tailScale",10)){
+        checkArguments(1,i,argc,"-tailScale");
+        dimage->gediIO.den->tailThresh=atof(argv[++i]);;
       }else if(!strncasecmp(argv[i],"-noiseTrack",11)){
         dimage->gediIO.den->noiseTrack=1;
       }else if(!strncasecmp(argv[i],"-pFile",6)){
         checkArguments(1,i,argc,"-pFile");
         strcpy(dimage->gediIO.den->pNamen,argv[++i]);
         dimage->gediIO.den->deconGauss=0;
+        dimage->readPulse=1;
+        dimage->gediIO.readPulse=1;
+        strcpy(dimage->gediIO.pulseFile,dimage->gediIO.den->pNamen);
       }else if(!strncasecmp(argv[i],"-pSigma",7)){
         dimage->gediIO.den->pSigma=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-gold",5)){
@@ -1912,6 +2489,8 @@ control *readCommands(int argc,char **argv)
         dimage->gTol=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-noRHgauss",10)){
         dimage->noRHgauss=1;
+      }else if(!strncasecmp(argv[i],"-onlySNR",8)){
+        dimage->onlySNR=1;
       }else if(!strncasecmp(argv[i],"-renoise",8)){
        dimage->renoiseWave=1;
       }else if(!strncasecmp(argv[i],"-newPsig",8)){
@@ -1971,11 +2550,27 @@ control *readCommands(int argc,char **argv)
         setBeamsToRead(&(dimage->gediIO.useBeam[0]),argv[++i]);
       }else if(!strncasecmp(argv[i],"-noCanopy",9)){
         dimage->noCanopy=1;
+      }else if(!strncasecmp(argv[i],"-noGroundRH",11)){
+        dimage->rhNoGround=1;
       #ifdef USEPHOTON
       }else if(!strncasecmp(argv[i],"-photonCount",12)){
         dimage->ice2=1;
+      }else if(!strncasecmp(argv[i],"-photonWave",11)){
+        dimage->gediIO.photonWave=1;
+      }else if(!strncasecmp(argv[i],"-photonPCL",10)){
+        dimage->gediIO.pclPhoton=1;        /*Pulse compression lidar with photon counting*/
       }else if(!strncasecmp(argv[i],"-pcl",4)){
-        dimage->pclPhoton=1;        /*Pulse compression lidar*/
+        dimage->gediIO.pcl=1;              /*Pulse compression lidar*/
+      }else if(!strncasecmp(argv[i],"-preSmooPCL",11)){
+        checkArguments(1,i,argc,"-preSmooPCL");
+        dimage->gediIO.pclSwidth=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-hann",5)){
+        checkArguments(1,i,argc,"-hann");
+        dimage->gediIO.hannWidth=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-writePcl",4)){
+        dimage->gediIO.writePcl=1;
+      }else if(!strncasecmp(argv[i],"-shotNoise",4)){
+        dimage->noise.shotNoise=1;
       }else if(!strncasecmp(argv[i],"-nPhotons",9)){
         checkArguments(1,i,argc,"-nPhotons");
         dimage->photonCount.designval=atof(argv[++i]);
@@ -1985,9 +2580,6 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-noiseMult",10)){
         checkArguments(1,i,argc,"-noiseMult");
         dimage->photonCount.noise_mult=atof(argv[++i]);
-      }else if(!strncasecmp(argv[i],"-rhoVrhoG",9)){
-        checkArguments(1,i,argc,"-rhoVrhoG");
-        dimage->photonCount.rhoVrhoG=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-nPhotG",7)){
         checkArguments(1,i,argc,"-nPhotG");
         dimage->photonCount.nPhotG=atof(argv[++i]);
@@ -1997,6 +2589,13 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-photHDF",8)){
         dimage->photonCount.writeHDF=1;
       #endif
+      }else if(!strncasecmp(argv[i],"-rhoVrhoG",9)){
+        checkArguments(1,i,argc,"-rhoVrhoG");
+        dimage->scaleRhoVrhoG=atof(argv[++i]);
+        dimage->changeGrRho=1;
+      }else if(!strncasecmp(argv[i],"-nMessages",10)){
+        checkArguments(1,i,argc,"-nMessages");
+        dimage->gediIO.nMessages=atoi(argv[++i]);;
       }else if(!strncasecmp(argv[i],"-help",5)){
         writeHelp();
         exit(1);
@@ -2038,6 +2637,7 @@ void writeHelp()
 -beamList 11111111; 0/1 for whether or not to use beams 1-8\n\
 -skipBeams n;     list of beam numbers to skip. No spaces between (eg 123)\n\
 -readBeams n;     list of beam numbers to read. No spaces between (eg 123)\n\
+-nMessages n;     number of progress messages to output\n\
 \nSwitches\n\
 -ground;          read true ground from file\n\
 -useInt;          use discrete intensity instead of count\n\
@@ -2046,6 +2646,7 @@ void writeHelp()
 -laiRes res;      lai profile resolution in metres\n\
 -laiH h;          height to calculate LAI to\n\
 -noRHgauss;       do not fit Gaussians\n\
+-onlySNR;         only calculate the SNR, no metrics\n\
 -gTol tol;        ALS ground tolerance. Used to calculate slope.\n\
 -fhdHistRes res;  waveform intensity resolution to use when calculating FHD from histograms\n\
 -forcePsigma;     do not read pulse sigma from file\n\
@@ -2053,6 +2654,8 @@ void writeHelp()
 -dontTrustGround; don't trust ground in waveforms, if included\n\
 -noRoundCoord;    do not round up coords when outputting\n\
 -noCanopy;        do not calculate FHD histograms and LAI profiles\n\
+-noGroundRH;      do not include ground energy in RH metric calculation\n\
+-rhoVrhoG x;      ratio of canopy to ground reflectance at this wavelength for rescaling waveform. Note different from rhoV and rhoG\n\
 \nAdding noise:\n\
 -dcBias n;        mean noise level\n\
 -nSig sig;        noise sigma\n\
@@ -2072,21 +2675,29 @@ void writeHelp()
 -minGap gap;      delete signal beneath min detectable gap fraction\n");
   #ifdef USEPHOTON
   fprintf(stdout,"\nPhoton counting\n\
--photonCount;     output point cloud from photon counting\n\
--pcl;             convert to photon counting pulse-compressed before processing\n\
+-photonCount;     output point cloud from photon-counting\n\
+-photonWave;      make a pseudo-waveform from photon-counting\n\
 -nPhotons n;      mean number of photons\n\
--photonWind x;    window length for photon counting search, metres\n\
--noiseMult x;     noise multiplier for photon-counting\n\
--rhoVrhoG x;      ratio of canopy to ground reflectance at this wavelength. Not different from rhoV and rhoG\n\
+-photonWind x;    twice window length for photon counting search, metres (2 way distance)\n\
+-noiseMult x;     noise multiplier for photon-counting. Noise photon rate in micro Hz\n\
 -nPhotC n;        mean number of canopy photons (replaces nPhotons and rhoVrhoG)\n\
 -nPhotG n;        mean number of ground photons (replaces nPhotons and rhoVrhoG)\n\
 -photHDF;         write photon-counting output in HDF5\n");
   #endif
+  fprintf(stdout,"\nUnfinished\n\
+-photonPCL;       convert to photon counting pulse-compressed before processing\n\
+-pcl;             pulse-compressed processing\n\
+-preSmooPCL sig;  pre-smooth before PCL with a Gaussian\n\
+-hann width;      apply a Hann filter after PCL\n\
+-writePcl;        write out the intermediate PCL waves\n\
+-shotNoise;       apply shot noise\n\
+");
   fprintf(stdout,"\nDenoising:\n\
 -meanN n;         mean noise level, if using a predefined mean level\n\
 -thresh n;        noise threshold, if using a predefined noise threshold\n\
 -varNoise;        use a variable noise threshold\n\
 -varScale x;      variable noise threshold scale (multiple of stdev above mean to set threshold)\n\
+-tailScale x;     variable noise threshold scale for trailing edge. Equal to varScale by default (multiple of stdev above mean to set threshold)\n\
 -statsLen len;    length to calculate noise stats over for varNoise\n\
 -noiseTrack;      use noise tracking\n\
 -sWidth sig;      smoothing width, after denoising\n\
@@ -2101,8 +2712,8 @@ void writeHelp()
 -medNoise;        use median stats rather than mean\n\
 -varDrift;        correct detector drift with variable factor\n\
 -driftFac xi;     fix drift with constant drift factor\n\
--rhoG rho;        ground reflectance\n\
--rhoC rho;        canopy reflectance\n\
+-rhoG rho;        ground reflectance for calculating true canopy cover\n\
+-rhoC rho;        canopy reflectance for calculating true canopy cover\n\
 -pSigma sig;      pulse width to smooth by if using Gaussian pulse\n\
 -gold;            deconvolve with Gold's method\n\
 -deconTol tol;    deconvolution tolerance\n\

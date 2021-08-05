@@ -448,7 +448,7 @@ void writeGEDIwave(control *dimage,waveStruct *waves,int numb)
 
     fprintf(opoo,"%f",r);
     for(j=0;j<dimage->gediIO.nTypeWaves;j++){
-      fprintf(opoo," %f",waves->wave[j][i]);
+      fprintf(opoo," %.10f",waves->wave[j][i]);
        if(dimage->gediIO.ground&&(j<3))fprintf(opoo," %f %f",waves->canopy[j][i],waves->ground[j][i]);
     }
     fprintf(opoo,"\n");
@@ -548,7 +548,7 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.pFWHM=15.0;   /*12 ns FWHM*/
   dimage->gediIO.fSigma=5.5;  /*86% of energy within a diameter of 20-25m*/
   dimage->gediIO.res=0.15;
-  dimage->gediIO.pRes=0.01;
+  dimage->gediIO.pRes=dimage->gediIO.res/4.0;
   dimage->gediRat.coord[0]=624366.0;
   dimage->gediRat.coord[1]=3.69810*pow(10.0,6.0);
   dimage->gediRat.decon=NULL;
@@ -581,6 +581,7 @@ control *readCommands(int argc,char **argv)
   dimage->gediRat.defWfront=0;  /*Gaussian footprint*/
   dimage->gediRat.wavefront=NULL;
   dimage->gediIO.pcl=0;         /*do not use PCL*/
+  dimage->gediIO.pclPhoton=0;         /*do not use PCL*/
 
   /*beams*/
   dimage->gediIO.useCount=dimage->gediIO.useFrac=dimage->gediIO.useInt=1;
@@ -762,8 +763,12 @@ control *readCommands(int argc,char **argv)
   /*total number of beams*/
   dimage->gediIO.nTypeWaves=dimage->gediIO.useCount+dimage->gediIO.useFrac+dimage->gediIO.useInt;
 
+  /*ensure pulse is sampled at same rate as waveform*/
+  if(dimage->gediIO.readPulse==0)dimage->gediIO.pRes=dimage->gediIO.res;
+
   return(dimage);
 }/*readCommands*/
+
 
 /*####################################*/
 /*Help message*/

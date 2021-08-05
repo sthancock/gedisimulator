@@ -68,6 +68,7 @@ typedef struct{
   char solveCofG;      /*use deltaCofG as offset switch*/
   uint64_t pBuffSize;  /*point buffer rading size in bytes*/
   char filtOutli;      /*filter outliers to avoid falling trees*/
+  float outStdev;      /*threshold to use for outlier stdevs*/
   float maxZen;        /*maximum LVIS zenith angle to use*/
   float minDense;      /*minimum ALS beam density*/
   float minSense;      /*minimum waveform beam sensitivity to use*/
@@ -90,6 +91,7 @@ typedef struct{
   int nUsed;           /*number of footprints used in optimum*/
   char writeSimProg;   /*write simplex progress switch*/
   char writeFinWave;   /*write out final waveforms switch*/
+  char useMean;        /*use mead, rather than median*/
   /*simulated annealing*/
   int annealNtries;
   int anealItersfixed_T;
@@ -496,6 +498,7 @@ double findMeanCorr(const gsl_vector *v, void *params)
   float **denoised=NULL;
   float **correl=NULL,meanCorrel=0;
   float meanCofG=0;
+  float *temp1=NULL,*temp2=NULL;
   double xOff=0,yOff=0,zOff=0;
   double **coords=NULL;
   control *dimage=NULL;
@@ -525,15 +528,40 @@ double findMeanCorr(const gsl_vector *v, void *params)
   correl=getCorrelStats(dimage,lvis,als,&contN,xOff,yOff,zOff,coords,denoised,nTypeWaves,dimage->leaveEmpty);
 
   /*get mean correlation*/
-  meanCorrel=meanCofG=0.0;
-  for(i=0;i<contN;i++){
-    meanCorrel+=correl[i][0];
-    meanCofG+=correl[i][1];
-  }
-  if(contN>0){
-    meanCorrel/=(float)contN;
-    meanCofG/=(float)contN;
-  }
+  if(dimage->useMean){  /*calculate means*/
+
+    /*set to zero*/
+    meanCorrel=meanCofG=0.0;
+
+    /*add up*/
+    for(i=0;i<contN;i++){
+      meanCorrel+=correl[i][0];
+      meanCofG+=correl[i][1];
+    }
+
+    /*normalise*/
+    if(contN>0){
+      meanCorrel/=(float)contN;
+      meanCofG/=(float)contN;
+    }
+  }else{  /*calculate medians*/
+
+    /*rearrange arrays to pass to median*/
+    temp1=falloc(contN,"temp correlation",0);
+    temp2=falloc(contN,"temp CofG",0);
+    for(i=0;i<contN;i++){
+      temp1[i]=correl[i][0];
+      temp2[i]=correl[i][1];
+    }
+
+    /*find medians*/
+    meanCorrel=singleMedian(temp1,contN);
+    meanCofG=singleMedian(temp2,contN);
+
+    /*tidy up*/
+    TIDY(temp1);
+    TIDY(temp2);
+  }/*average correlation*/
 
   /*record number used*/
   dimage->nUsed=contN;
@@ -541,13 +569,14 @@ double findMeanCorr(const gsl_vector *v, void *params)
 
   /*tidy up*/
   TTIDY((void **)dimage->gediRat.coords,dimage->gediRat.gNx);
-  TTIDY((void **)correl,dimage->gediRat.gNx);
+  TTIDY((void **)correl,contN);
   dimage=NULL;
   coords=NULL;
   denoised=NULL;
   lvis=NULL;
   als=NULL;
   optBits=NULL; 
+
   return(1.0-(double)meanCorrel);
 }/*findMeanCorr*/
 
@@ -917,7 +946,7 @@ void fullBullseyePlot(control *dimage,float **denoised,int nTypeWaves,dataStruct
 
         /*tidy up*/
         TTIDY((void **)dimage->gediRat.coords,dimage->gediRat.gNx);
-        TTIDY((void **)correl,dimage->gediRat.gNx);
+        TTIDY((void **)correl,contN);
       }/*z loop*/
     }/*y loop*/
   }/*x loop*/
@@ -943,7 +972,9 @@ float **getCorrelStats(control *dimage,dataStruct **lvis,pCloudStruct **als,int 
 {
   int k=0;
   float **correl=NULL;
+  float ** filterOutliers(float **,int *,float,int);
   waveStruct *waves=NULL;
+
 
   /*progress report*/
   if(globAnneal.dimage==NULL)fprintf(stdout,"Testing x %.2f y %.2f z %.2f fSig %.2f\n",xOff,yOff,zOff,dimage->simIO.fSigma);
@@ -987,8 +1018,69 @@ float **getCorrelStats(control *dimage,dataStruct **lvis,pCloudStruct **als,int 
     correl=NULL;
     if(leaveEmpty)exit(1);
   }
+
+  /*filter outliers if needed*/
+  if(dimage->filtOutli)correl=filterOutliers(correl,contN,dimage->outStdev,nTypeWaves);
+
   return(correl);
 }/*getCorrelStats*/
+
+
+/*####################################################*/
+/*filter outliers from correlation*/
+
+float **filterOutliers(float **correl,int *contN,float outStdev,int nTypeWaves)
+{
+  int k=0,i=0;
+  int usedNew=0,nUsed=0;
+  float mean=0,stdev=0,thresh=0;
+  float **newCorrel=NULL;
+
+  newCorrel=fFalloc(*contN,"filtered correlation",0);
+
+  /*loop over types*/
+  for(k=0;k<nTypeWaves;k++){
+
+    /*find the mean*/
+    mean=stdev=0.0;
+    nUsed=0;
+    for(i=0;i<*contN;i++){
+      if(correl[i]){
+        mean+=correl[i][2*k];
+        nUsed++;
+      }
+      mean/=(float)nUsed;
+    } 
+
+    /*find standard deviation*/
+    for(i=0;i<*contN;i++){
+      if(correl[i]){
+        stdev+=pow(correl[i][2*k]-mean,2.0);
+      }
+    }
+    stdev=sqrt(stdev/(float)nUsed);
+
+    /*apply a threshold*/
+    thresh=outStdev*stdev+mean;
+    usedNew=0;
+    for(i=0;i<*contN;i++){
+      if(correl[i]){
+        if(correl[i][2*k]<thresh){
+          newCorrel[usedNew]=falloc(2,"filtered correlation",usedNew+1);
+          newCorrel[usedNew][2*k]=correl[i][2*k];
+          newCorrel[usedNew][2*k+1]=correl[i][2*k+1];
+          usedNew++;
+        }
+      }
+    }
+
+  }/*type loop*/
+
+  TTIDY((void **)correl,*contN);
+  *contN=usedNew;
+
+  return(newCorrel);
+}/*filterOutliers*/
 
 
 /*####################################################*/
@@ -996,47 +1088,33 @@ float **getCorrelStats(control *dimage,dataStruct **lvis,pCloudStruct **als,int 
 
 void writeCorrelStats(float **correl,int numb,int nTypes,FILE *opoo,double xOff,double yOff,double zOff,control *dimage)
 {
-  int i=0,k=0,nUsed=0;
+  int i=0,k=0;
   int usedNew=0;
   float mean=0,stdev=0;
-  float newMean=0,meanCofG=0;
-  float thresh=0;
+  float meanCofG=0;
   char writtenCoords=0;
 
   /*loop over types*/
   for(k=0;k<nTypes;k++){
-    mean=stdev=0.0;
-    nUsed=0;
+
+    usedNew=0;
+    mean=meanCofG=0.0;
     for(i=0;i<numb;i++){
       if(correl[i]){
         mean+=correl[i][2*k];
-        nUsed++;
+        meanCofG+=correl[i][2*k+1];
+        usedNew++;
       }
     }
-    mean/=(float)nUsed;
-    meanCofG/=(float)nUsed;
+    mean/=(float)usedNew;
+    meanCofG/=(float)usedNew;
+    stdev=0.0;
     for(i=0;i<numb;i++){
       if(correl[i]){
         stdev+=pow(correl[i][2*k]-mean,2.0);
       }
     }
-    stdev=sqrt(stdev/(float)nUsed);
-
-    /*check for outliers*/
-    if(dimage->filtOutli)thresh=2.5*stdev;
-    else                 thresh=1000000000.0;
-
-    usedNew=0;
-    newMean=meanCofG=0.0;
-    for(i=0;i<numb;i++){
-      if(correl[i]){
-        if((mean-correl[i][2*k])<thresh){
-          newMean+=correl[i][2*k];
-          meanCofG+=correl[i][2*k+1];
-          usedNew++;
-        }
-      }
-    }
+    stdev=sqrt(stdev/(float)usedNew);
 
     /*check that there is data*/
     if(usedNew==0)return;
@@ -1047,20 +1125,9 @@ void writeCorrelStats(float **correl,int numb,int nTypes,FILE *opoo,double xOff,
       writtenCoords=1;
     }
 
-    newMean/=(float)usedNew;
-    meanCofG/=(float)usedNew;
-    stdev=0.0;
-    for(i=0;i<numb;i++){
-      if(correl[i]){
-        if((mean-=correl[i][2*k])<thresh){
-          stdev+=pow(correl[i][2*k]-newMean,2.0);
-        }
-      }
-    }
-    stdev=sqrt(stdev/(float)usedNew);
-    fprintf(opoo," %f %f %f %d",newMean,stdev,meanCofG,usedNew);
+    fprintf(opoo," %f %f %f %d",mean,stdev,meanCofG,usedNew);
   }
-  fprintf(opoo," %d\n",nUsed);
+  fprintf(opoo," %d\n",usedNew);
 
   return;
 }/*writeCorrelStats*/
@@ -1317,6 +1384,8 @@ void copyLvisCoords(gediRatStruct *gediRat,dataStruct **lvis,int nLvis,int aEPSG
   OGRCoordinateTransformationH hTransform;
   OGRSpatialReferenceH hSourceSRS,hTargetSRS;
   OGRErr err;
+  int verMaj=0;
+  int findGDAlVerMaj();
 
   gediRat->gNx=nLvis;
   gediRat->gNy=1;
@@ -1325,13 +1394,25 @@ void copyLvisCoords(gediRatStruct *gediRat,dataStruct **lvis,int nLvis,int aEPSG
 
 
   if(aEPSG!=lEPSG){
+    /*GDAL 3.0 and later now returns lat lon rather than lon lat. Find majer version*/
+    /*this will need updating once we hit version 10*/
+    verMaj=findGDAlVerMaj();
+
     x=dalloc(nLvis,"x",0);
     y=dalloc(nLvis,"y",0);
     z=dalloc(nLvis,"z",0);
-    for(i=0;i<nLvis;i++){
-      x[i]=lvis[i]->lon;
-      y[i]=lvis[i]->lat;
-      z[i]=0.0;
+    if(verMaj>=3){  /*if GDAL >=v3, need to swap lat and lon*/
+      for(i=0;i<nLvis;i++){
+        x[i]=lvis[i]->lat;
+        y[i]=lvis[i]->lon;
+        z[i]=0.0;
+      }
+    }else{
+      for(i=0;i<nLvis;i++){
+        x[i]=lvis[i]->lon;
+        y[i]=lvis[i]->lat;
+        z[i]=0.0;
+      }
     }
 
     hSourceSRS=OSRNewSpatialReference(NULL);
@@ -1415,7 +1496,7 @@ dataStruct **readMultiLVIS(control *dimage,float *res)
   *res/=(float)dimage->nLvis;
 
 
-  fprintf(stdout,"Found %d LVIS\n",dimage->nLvis);
+  fprintf(stdout,"Found %d waveforms\n",dimage->nLvis);
   if(dimage->nLvis==0){
     fprintf(stderr,"No large-footprints found\n");
     exit(1);
@@ -1506,6 +1587,11 @@ dataStruct **copyGEDIhdf(gediHDF *hdf,dataStruct **lvis,control *dimage,double *
   int i=0,nNew=0;
   double x=0,y=0;
 
+  /*wrap around*/
+  if(dimage->lvisIO.wEPSG==4326){
+    if(bounds[0]<0.0)bounds[0]+=360.0;
+    if(bounds[2]<0.0)bounds[2]+=360.0;
+  }
 
   /*count number within*/
   nNew=0;
@@ -1527,6 +1613,7 @@ dataStruct **copyGEDIhdf(gediHDF *hdf,dataStruct **lvis,control *dimage,double *
       exit(1);
     }
   }
+
 
   /*copy data*/
   nNew=0;
@@ -1554,6 +1641,12 @@ dataStruct **copyLVIShdf(lvisHDF *hdf,dataStruct **lvis,control *dimage,double *
 {
   int i=0,nNew=0;
   double x=0,y=0;
+
+  /*wrap around*/
+  if(dimage->lvisIO.wEPSG==4326){
+    if(bounds[0]<0.0)bounds[0]+=360.0;
+    if(bounds[2]<0.0)bounds[2]+=360.0;
+  }
 
   /*count number within*/
   nNew=0;
@@ -1609,6 +1702,11 @@ void setALSbounds(control *dimage)
   /*set nonesense values*/
   dimage->minX=dimage->minY=10000000000.0;
   dimage->maxX=dimage->maxY=-10000000000.0;
+
+  if(!dimage->simIO.nFiles){
+    fprintf(stderr,"No ALS data provided?\n");
+    exit(1);
+  }
 
   /*loop over ALS files and read bounds from header*/
   for(i=0;i<dimage->simIO.nFiles;i++){
@@ -1674,6 +1772,7 @@ control *readCommands(int argc,char **argv)
   dimage->lEPSG=dimage->lvisIO.wEPSG=4326;
   dimage->pBuffSize=(uint64_t)200000000;
   dimage->filtOutli=0;    /* do not filter outliers*/
+  dimage->outStdev=2.5;
   dimage->maxZen=100000.0;
   dimage->minDense=0.0;
   dimage->minSense=0.00000001;  /*a very small number*/
@@ -1724,7 +1823,7 @@ control *readCommands(int argc,char **argv)
   dimage->largeErr=0;        /*don't do a large error search*/
   dimage->findFsig=1;
   dimage->maxIter=300;
-  dimage->optTol=0.01;
+  dimage->optTol=0.2;
   dimage->writeSimProg=0;
   /*simulated annealing*/
   dimage->anneal=0;
@@ -1739,6 +1838,7 @@ control *readCommands(int argc,char **argv)
   dimage->annealTinitial=0.01;
   dimage->annealMu=1.2;
   dimage->annealTmin=0.00002;
+  dimage->useMean=1;    /*use mean, not median*/
 
   /*all data*/
   dimage->minX=-100000000.0;
@@ -1892,6 +1992,11 @@ control *readCommands(int argc,char **argv)
         dimage->filtOutli=0;
       }else if(!strncasecmp(argv[i],"-filtOut",8)){
         dimage->filtOutli=1;
+        if((i+1)<argc){
+          if(strncasecmp(argv[i+1],"-",1))dimage->outStdev=atof(argv[++i]);
+        }
+      }else if(!strncasecmp(argv[i],"-median",7)){
+        dimage->useMean=0;
       }else if(!strncasecmp(argv[i],"-noOctree",9)){
         dimage->gediRat.useOctree=0;
       }else if(!strncasecmp(argv[i],"-octLevels",9)){
@@ -1965,6 +2070,8 @@ control *readCommands(int argc,char **argv)
         dimage->writeSimProg=1;
       }else if(!strncasecmp(argv[i],"-solveCofG",10)){
         dimage->solveCofG=1;     /*use deltsCofG to estimate vertical offset*/
+      }else if(!strncasecmp(argv[i],"-checkCover",11)){
+        dimage->gediRat.checkCover=1;
       }else if(!strncasecmp(argv[i],"-writeWaves",11)){
         checkArguments(1,i,argc,"-writeWaves");
         strcpy(dimage->waveNamen,argv[++i]);
@@ -2033,8 +2140,10 @@ control *readCommands(int argc,char **argv)
 -minDense x;      minimum ALS beam density to accept\n\
 -decimate f;      decimate ALS point cloud by a factor, to save RAM\n\
 -noFilt;          don't filter outliers from correlation (default)\n\
--filtOut;         filter outliers from correlation stats\n\
+-filtOut s;       filter outliers from correlation stats, along with the number of standard deviations to use as a threshold\n\
 -smooth sig;      smooth both waves before comparing\n\
+-checkCover;      only include footprints that are at least 2/3 covered with ALS data\n\
+-median;          use median correlation rather than mean\n\
 \n# Simulator settings. For simulator validation only\n\
 -noNorm;          don't correct sims for ALS densiy variations\n\
 -norm;            correct sims for ALS densiy variations\n\

@@ -7,6 +7,9 @@ This is a set of programs to simulate large-footprint full-waveform lidar from a
 [Hancock, S., Armston, J., Hofton, M., Sun, X., Tang, H., Duncanson, L.I., Kellner, J.R. and Dubayah, R., 2019. The GEDI simulator: A large‐footprint waveform lidar simulator for calibration and validation of spaceborne missions. Earth and Space Science.](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2018EA000506)
 
 
+A google group has been set up for asking questions. It can be found [here](https://groups.google.com/g/gedisim).
+
+
 The programs are:
 
 
@@ -18,7 +21,7 @@ The programs are:
 
 **lasPoints**: outputs .pts files from .las files for selected areas.
 
-**lvisBullseye**: collocates GEDI or LVIS to ALS data, following [Blair and Hofton (1999)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/1999GL010484).
+**collocateWaves**: collocates GEDI or LVIS to ALS data, following [Blair and Hofton (1999)](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/1999GL010484).
 
 **addNoiseHDF**: Reads waveform data from HDF5 files and adds noise of a chosen level.
 
@@ -43,6 +46,14 @@ The other .c files are either small test programs in the development of the abov
 **gediIO.c**: contains the GEDI simulator functions.
 
 ### How do I get set up? ###
+
+There are three ways to install the code.
+
+* Singularity container: Simplest but needs root access to set up
+* Compile from souce: Do this of you are confident compiling C code
+* Compilation script: Automatically does the above. Do this if you don't have root access and are not confident compiling C code
+
+These three methods are listed below. Note that the compilation script will create a directory structure to install the code in to and modify your .bashrc file to point to these, so it is not recommended if you have a particular way you like your system set up.
 
 
 ##### Singularity container
@@ -104,7 +115,33 @@ Replace "**gediRat**" with each of the commands above to compile and install.
 Make sure that all **.csh** and **.bash** files are also in your path.
 
 
-# Function operation #
+### Compilation script
+
+There is a bash script that will create a directory structure, clone the necessary libraries that do not have package managres and compile the script. *Note* that the package managed libraries are still required and these should be installed first (Gnu Scientific Library, Geotiff, HDF5, GDAL).
+
+Download and run the script by typing the following commands in your terminal (Unix or Linux):
+
+    wget https://bitbucket.org/StevenHancock/gedisimulator/src/master/installGedi.bash
+    chmod +x installGedi.bash
+    installGedi.bash
+
+The will create the directory:
+
+   ***$HOME/src***
+
+To clone the source code to and will compile the executables to:
+
+   ***$HOME/bin***
+
+It will add that directory to your PATH so that your system will be able to find the commands. Afterwards you can test with:
+
+   collocateWaves -help
+
+Which, if it has worked, will print out the options for the collocateWaves tool.
+
+
+
+# Tool  operation #
 
 ## gediRat ##
 
@@ -340,7 +377,7 @@ Lefsky, Michael A., Michael Keller, Yong Pang, Plinio B. De Camargo, and Maria O
 
 
 
-## lvisBullseye ##
+## collocateWaves ##
 
 Uses the correlation method in Blair and Hofton (1999) to colocate a large-footprint lidar dataset with a small-footprint, discrete-return dataset. It uses the Pearson correlation to find the best affine transformation (x and y only, or x, y and z) and footprint size needed to align a large-footprint dataset with a small-footprint dataset. It has three potential modes of operation.
 
@@ -405,8 +442,10 @@ If the full grid is used, it outputs an ASCII file with the correlation for each
     -minDense x;      minimum ALS beam density to accept
     -decimate f;      decimate ALS point cloud by a factor, to save RAM
     -noFilt;          don't filter outliers from correlation (default)
-    -filtOut;         filter outliers from correlation stats
+    -filtOut s;       filter outliers from correlation stats along with an optional sigma
     -smooth sig;      smooth both waves before comparing
+    -checkCov;        check ALS coverage and remove any with footprints with less than 2/3 coverage
+    -median;          use the median correlation when optimising, rather than the mean (default)
 
 #### GEDI beam selection
     -beamList 11111111; 0/1 for whether or not to use beams 1-8 on GEDI
@@ -424,6 +463,10 @@ If the full grid is used, it outputs an ASCII file with the correlation for each
     -octLevels n;    number of octree levels to use
     -nOctPix n;      number of octree pixels along a side for the top level
 
+
+## plotWaveComparison.py ##
+
+Plots waveforms to compare ALS derived simulations to real GEDI data. It is meant to take the output from collocateWaves' -writeWaves option and compare to the original GEDI data. If the collocation has been successful, the two will match.
 
 ## mapLidar ##
 Generates a geotiff from las file properties, combining multiple files. Can also print a list of file bounds or calculate beam and point density.
@@ -460,5 +503,7 @@ Please talk to svenhancock@gmail.com to suggest edits.
 Gnu Public License
 
 ### Who do I talk to? ###
+
+Questions can be posted on this [Google group]((https://groups.google.com/g/gedisim) and answers found.
 
 svenhancock@gmail.com
