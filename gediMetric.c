@@ -14,6 +14,7 @@
 #include "gediNoise.h"
 #include "time.h"
 
+
 #define USEPHOTON
 
 #ifdef USEPHOTON
