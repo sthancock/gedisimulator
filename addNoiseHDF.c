@@ -54,6 +54,8 @@ typedef struct{
   char outNamen[200];  /*output filename*/
   /*input settings*/
   char readHDFgedi;    /*read GEDI HDF*/
+  /*output settings*/
+  char writeL1B;       /*write output in L1B format*/
   /*noise*/
   noisePar noise;  /*noise parameter structure*/
   float linkFsig;  /*footprint sigma used for link margin*/
@@ -72,6 +74,7 @@ int main(int argc,char **argv)
   control *readCommands(int,char **);
   gediHDF *hdfGedi;     /*GEDI HDF5 structure*/
   gediHDF *noiseGEDI(control *);
+  void copyPulse(gediHDF *,gediIOstruct *);
 
   /*read command Line*/
   dimage=readCommands(argc,argv);
@@ -79,8 +82,12 @@ int main(int argc,char **argv)
   /*read data and add noise*/
   hdfGedi=noiseGEDI(dimage);
 
+  /*copy the pulse over*/
+  copyPulse(hdfGedi,&(dimage->gediIO));
+
   /*write data*/
-  writeGEDIhdf(hdfGedi,dimage->outNamen,&dimage->gediIO);
+  if(dimage->writeL1B)writeGEDIl1b(hdfGedi,dimage->outNamen,&(dimage->gediIO));
+  else                writeGEDIhdf(hdfGedi,dimage->outNamen,&(dimage->gediIO));
 
   /*tidy up*/
   hdfGedi=tidyGediHDF(hdfGedi);
@@ -155,6 +162,15 @@ gediHDF *noiseGEDI(control *dimage)
 
 
 /*####################################################*/
+/*copy the pulse over*/
+
+void copyPulse(gediHDF *hdfGedi,gediIOstruct *gediIO)
+{
+
+  return;
+}/*copyPulse*/
+
+/*####################################################*/
 /*tidy data structure*/
 
 dataStruct *tidyData(dataStruct *data,char readHDFgedi)
@@ -192,6 +208,7 @@ control *readCommands(int argc,char **argv)
 
   /*defaults*/
   dimage->readHDFgedi=1;
+  dimage->writeL1B=0;
   dimage->noise.linkNoise=1;
   dimage->noise.shotNoise=0;
   dimage->noise.missGround=0;
@@ -222,6 +239,8 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-output",7)){
         checkArguments(1,i,argc,"-output");
         strcpy(dimage->outNamen,argv[++i]);
+      }else if(!strncasecmp(argv[i],"-l1b",4)){
+        dimage->writeL1B=1;
       }else if(!strncasecmp(argv[i],"-linkFsig",9)){
         checkArguments(1,i,argc,"-linkFsig");
         dimage->linkFsig=atof(argv[++i]);
@@ -247,7 +266,7 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-dcBias");
         dimage->noise.offset=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-help",5)){
-        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;   output filename\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;       footprint width to use when calculating and applying signal noise\n-linkPsig sig;       pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-bitRate n;      DN bit rate\n\n");
+        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;    output filename\n-l1b;            write output in L1B format\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;   footprint width to use when calculating and applying signal noise\n-linkPsig sig;   pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-bitRate n;      DN bit rate\n\n");
         exit(1);
       }else{
         fprintf(stderr,"%s: unknown argument on command line: %s\nTry gediRat -help\n",argv[0],argv[i]);

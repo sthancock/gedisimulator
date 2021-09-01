@@ -1016,57 +1016,66 @@ void rearrangePulsetoTX(gediIOstruct *gediIO,gediHDF *hdfData,TXstruct *tx)
   int buff=0;
   float *txwave=NULL;
 
-  /*resample the resolution*/
-  buff=50;   /*pad before and after the TX wave incase the L2A code needs some workspace*/
-  tx->nBins=(uint16_t)((float)gediIO->pulse->nBins*gediIO->pRes/gediIO->res)+(uint16_t)(2*buff);
 
-  /*allocate space*/
-  if(!(tx->txCount=(uint16_t *)calloc(hdfData->nWaves,sizeof(uint16_t)))){
-    fprintf(stderr,"error in txCount allocation.\n");
-    exit(1);
-  }
-  if(!(tx->txStart=(uint64_t *)calloc(hdfData->nWaves,sizeof(uint64_t)))){
-    fprintf(stderr,"error in txStart allocation.\n");
-    exit(1);
-  }
+  /*is there a defined pulse?*/
+  if(gediIO->pulse){
+    /*resample the resolution*/
+    buff=50;   /*pad before and after the TX wave incase the L2A code needs some workspace*/
+    tx->nBins=(uint16_t)((float)gediIO->pulse->nBins*gediIO->pRes/gediIO->res)+(uint16_t)(2*buff);
 
+    /*allocate space*/
+    if(!(tx->txCount=(uint16_t *)calloc(hdfData->nWaves,sizeof(uint16_t)))){
+      fprintf(stderr,"error in txCount allocation.\n");
+      exit(1);
+    }
+    if(!(tx->txStart=(uint64_t *)calloc(hdfData->nWaves,sizeof(uint64_t)))){
+      fprintf(stderr,"error in txStart allocation.\n");
+      exit(1);
+    }
+  
 
-  /*make a resampled pulse*/
-  tx->txwave=falloc((int)tx->nBins*hdfData->nWaves,"txwave",0);
-  txwave=falloc((int)tx->nBins,"temp txwave",0);
-  contN=ialloc((int)tx->nBins,"txwave counter",0);
+    /*make a resampled pulse*/
+    tx->txwave=falloc((int)tx->nBins*hdfData->nWaves,"txwave",0);
+    txwave=falloc((int)tx->nBins,"temp txwave",0);
+    contN=ialloc((int)tx->nBins,"txwave counter",0);
 
-  /*zero counters*/
-  for(i=0;i<(int)tx->nBins;i++){
-    txwave[i]=0.0;
-    contN[i]=0;
-  }
+    /*zero counters*/
+    for(i=0;i<(int)tx->nBins;i++){
+      txwave[i]=0.0;
+      contN[i]=0;
+    }
 
-  /*count up*/
-  for(i=0;i<gediIO->pulse->nBins;i++){
-    j=(int)(gediIO->pulse->x[i]/gediIO->res)+buff;
-    if((j>=0)&&(j<(int)tx->nBins)){
-      txwave[j]+=gediIO->pulse->y[i];
-      contN[j]++;
+    /*count up*/
+    for(i=0;i<gediIO->pulse->nBins;i++){
+      j=(int)(gediIO->pulse->x[i]/gediIO->res)+buff;
+      if((j>=0)&&(j<(int)tx->nBins)){
+        txwave[j]+=gediIO->pulse->y[i];
+        contN[j]++;
+      }
+    }
+
+    /*normalise*/
+    tx->maxAmp=0.0;
+    for(i=0;i<(int)tx->nBins;i++){
+      if(contN[i]>0){
+        txwave[i]/=(float)contN[i];
+        if(txwave[i]>tx->maxAmp)tx->maxAmp=txwave[i];
+      }
+    }
+
+    /*populate arrays*/
+    for(i=0;i<hdfData->nWaves;i++){
+      tx->txCount[i]=tx->nBins;
+      tx->txStart[i]=(uint64_t)i*(uint64_t)tx->nBins;
+      memcpy(&(tx->txwave[i*(int)tx->nBins]),&(txwave[0]),sizeof(float)*tx->nBins);
+    }
+    TIDY(txwave);
+  }else{
+    if(tx->txwave==NULL){
+      fprintf(stderr,"Error in pulse definition\n");
+      exit(1);
     }
   }
-
-  /*normalise*/
-  tx->maxAmp=0.0;
-  for(i=0;i<(int)tx->nBins;i++){
-    if(contN[i]>0){
-      txwave[i]/=(float)contN[i];
-      if(txwave[i]>tx->maxAmp)tx->maxAmp=txwave[i];
-    }
-  }
-
-  /*populate arrays*/
-  for(i=0;i<hdfData->nWaves;i++){
-    tx->txCount[i]=tx->nBins;
-    tx->txStart[i]=(uint64_t)i*(uint64_t)tx->nBins;
-    memcpy(&(tx->txwave[i*(int)tx->nBins]),&(txwave[0]),sizeof(float)*tx->nBins);
-  }
-  TIDY(txwave);
 
   return;
 }/*rearrangePulsetoTX*/
