@@ -227,6 +227,7 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.useFrac=1;
   dimage->gediIO.nMessages=200;
   dimage->gediIO.ground=1;
+  dimage->gediIO.aEPSG=4326;      /*default is not to reproject*/
   dimage->linkFsig=5.5;
   dimage->linkPsig=0.9;
 
@@ -265,8 +266,11 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-dcBias",7)){
         checkArguments(1,i,argc,"-dcBias");
         dimage->noise.offset=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-aEPSG",6)){
+        checkArguments(1,i,argc,"-aEPSG");
+        dimage->gediIO.aEPSG=atoi(argv[++i]);
       }else if(!strncasecmp(argv[i],"-help",5)){
-        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;    output filename\n-l1b;            write output in L1B format\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;   footprint width to use when calculating and applying signal noise\n-linkPsig sig;   pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-bitRate n;      DN bit rate\n\n");
+        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;    output filename\n-l1b;            write output in L1B format\n-aEPSG epsg;     EPSG code of ALS data if writing in L1B format\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;   footprint width to use when calculating and applying signal noise\n-linkPsig sig;   pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-bitRate n;      DN bit rate\n\n");
         exit(1);
       }else{
         fprintf(stderr,"%s: unknown argument on command line: %s\nTry gediRat -help\n",argv[0],argv[i]);

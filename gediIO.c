@@ -1014,42 +1014,80 @@ void rearrangePulsetoTX(gediIOstruct *gediIO,gediHDF *hdfData,TXstruct *tx)
   int i=0,j=0;
   int *contN=NULL;
   int buff=0;
-  float *txwave=NULL;
+  int nPbins=0;
+  float pRes=0,res=0;         /*pulse and wave resolution*/
+  float *pulse=NULL,*pX=NULL; /*pointers to pulse amplitude and x*/
+  float *setPx(float,int);
+  float *txwave=NULL;         /*resamped pulse*/
+  gediRatStruct gediRat;
 
 
-  /*is there a defined pulse?*/
-  if(gediIO->pulse){
-    /*resample the resolution*/
-    buff=50;   /*pad before and after the TX wave incase the L2A code needs some workspace*/
-    tx->nBins=(uint16_t)((float)gediIO->pulse->nBins*gediIO->pRes/gediIO->res)+(uint16_t)(2*buff);
+  /*set pointers to piulse, depending on where it is defined*/
+  if(gediIO->pulse){             /*pulse is defined in the sim settings*/
+    pRes=gediIO->pRes;
+    nPbins=gediIO->pulse->nBins;
+    pulse=gediIO->pulse->y;
+    pX=gediIO->pulse->x;
+    res=gediIO->res;
+  }else if(hdfData->pulse){      /*pulse is defined in a HDF file*/
+    pRes=hdfData->pRes;
+    nPbins=hdfData->nPbins;
+    pulse=hdfData->pulse;
+    pX=setPx(pRes,nPbins);
+    res=(hdfData->z0[0]-hdfData->zN[0])/(float)(hdfData->nBins[0]-1);
+  }else if(hdfData->pSigma>0.0){ /*pulse is Gaussian and needs defining*/
+    /*set pulse*/
+    gediIO->pSigma=hdfData->pSigma;
+    gediIO->readPulse=0;
+    gediRat.iThresh=0.0006;
+    gediIO->res=(hdfData->z0[0]-hdfData->zN[0])/(float)(hdfData->nBins[0]-1);
+    gediIO->pRes=gediIO->res;
+    setGediPulse(gediIO,&gediRat);
+    /*set pointers*/
+    pRes=gediIO->pRes;
+    nPbins=gediIO->pulse->nBins;
+    pulse=gediIO->pulse->y;
+    pX=gediIO->pulse->x;
+    res=gediIO->res;
+  }else{
+    fprintf(stderr,"No pulse defined. Cannot write L1B format without pulse.\n");
+    exit(1);
+  }
 
-    /*allocate space*/
-    if(!(tx->txCount=(uint16_t *)calloc(hdfData->nWaves,sizeof(uint16_t)))){
-      fprintf(stderr,"error in txCount allocation.\n");
-      exit(1);
-    }
-    if(!(tx->txStart=(uint64_t *)calloc(hdfData->nWaves,sizeof(uint64_t)))){
-      fprintf(stderr,"error in txStart allocation.\n");
-      exit(1);
-    }
-  
 
-    /*make a resampled pulse*/
-    tx->txwave=falloc((int)tx->nBins*hdfData->nWaves,"txwave",0);
-    txwave=falloc((int)tx->nBins,"temp txwave",0);
-    contN=ialloc((int)tx->nBins,"txwave counter",0);
+  /*resample the resolution*/
+  buff=50;   /*pad before and after the TX wave in case the L2A code needs some workspace*/
+  tx->nBins=(uint16_t)((float)nPbins*pRes/res)+(uint16_t)(2*buff);
 
-    /*zero counters*/
-    for(i=0;i<(int)tx->nBins;i++){
-      txwave[i]=0.0;
-      contN[i]=0;
-    }
+  /*allocate space*/
+  if(!(tx->txCount=(uint16_t *)calloc(hdfData->nWaves,sizeof(uint16_t)))){
+    fprintf(stderr,"error in txCount allocation.\n");
+    exit(1);
+  }
+  if(!(tx->txStart=(uint64_t *)calloc(hdfData->nWaves,sizeof(uint64_t)))){
+    fprintf(stderr,"error in txStart allocation.\n");
+    exit(1);
+  }
 
-    /*count up*/
-    for(i=0;i<gediIO->pulse->nBins;i++){
-      j=(int)(gediIO->pulse->x[i]/gediIO->res)+buff;
+
+  /*make a resampled pulse*/
+  tx->txwave=falloc((int)tx->nBins*hdfData->nWaves,"txwave",0);
+  txwave=falloc((int)tx->nBins,"temp txwave",0);
+  contN=ialloc((int)tx->nBins,"txwave counter",0);
+
+  /*zero counters*/
+  for(i=0;i<(int)tx->nBins;i++){
+    txwave[i]=0.0;
+    contN[i]=0;
+  }
+
+
+  /*count up*/
+
+    for(i=0;i<nPbins;i++){
+      j=(int)(pX[i]/res)+buff;
       if((j>=0)&&(j<(int)tx->nBins)){
-        txwave[j]+=gediIO->pulse->y[i];
+        txwave[j]+=pulse[i];
         contN[j]++;
       }
     }
@@ -1070,15 +1108,28 @@ void rearrangePulsetoTX(gediIOstruct *gediIO,gediHDF *hdfData,TXstruct *tx)
       memcpy(&(tx->txwave[i*(int)tx->nBins]),&(txwave[0]),sizeof(float)*tx->nBins);
     }
     TIDY(txwave);
-  }else{
-    if(tx->txwave==NULL){
-      fprintf(stderr,"Error in pulse definition\n");
-      exit(1);
-    }
-  }
+
+
+
+
 
   return;
 }/*rearrangePulsetoTX*/
+
+
+/*####################################################*/
+/*set the x array for a pulse*/
+
+float *setPx(float pRes,int nPbins)
+{
+  int i=0;
+  float *pX=NULL;
+
+  pX=falloc(nPbins,"pulse x",0);
+  for(i=0;i<nPbins;i++)pX[i]=(float)i*pRes;
+
+  return(pX);
+}/*setPx*/
 
 
 /*####################################################*/
