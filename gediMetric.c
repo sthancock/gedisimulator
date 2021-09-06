@@ -2346,7 +2346,7 @@ control *readCommands(int argc,char **argv)
         dimage->gediIO.inList=NULL;
         dimage->gediIO.nFiles=1;
         dimage->gediIO.inList=chChalloc(dimage->gediIO.nFiles,"input name list",0);
-        dimage->gediIO.inList[0]=challoc((uint64_t)strlen(argv[++i])+10,"input name list",0);
+        dimage->gediIO.inList[0]=challoc((uint64_t)strlen(argv[++i])+30,"input name list",0);
         strcpy(&(dimage->gediIO.inList[0][0]),argv[i]);
       }else if(!strncasecmp(argv[i],"-inList",7)){
         checkArguments(1,i,argc,"-inList");

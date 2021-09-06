@@ -14,6 +14,7 @@
 #include "gediIO.h"
 #include "gediNoise.h"
 #include "ogr_srs_api.h"
+#include "gsl/gsl_fft_complex.h"
 
 
 /*tolerances*/
@@ -2234,8 +2235,13 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
     }
     gediIO->pulse->y=hdfGedi[0]->pulse;
     gediIO->pulse->nBins=hdfGedi[0]->nPbins;
-    gediIO->pRes=hdfGedi[0]->pRes;
+    gediIO->pRes=gediIO->pulse->pRes=hdfGedi[0]->pRes;
     gediIO->pulse->x=setPulseRange(gediIO);
+
+    /*if doing PCL, find peak frequency*/
+    if((gediIO->pcl||gediIO->pclPhoton)&&(gediIO->pulse!=NULL)){
+      setPeakChirp(gediIO->pulse);
+    }/*peak frequency if needed*/
 
     /*and copy in to denoising structure*/
     gediIO->den->pBins=gediIO->pulse->nBins;
@@ -3275,8 +3281,71 @@ void setGediPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
     readSimPulse(gediIO,gediRat);
   }
 
+  /*determine peak frequency if needed*/
+  if((gediIO->pcl||gediIO->pclPhoton)&&(gediIO->pulse!=NULL)){
+    setPeakChirp(gediIO->pulse);
+  }/*peak frequency if needed*/
+
+
   return;
 }/*setGediPulse*/
+
+
+/*####################################*/
+/*set peak frequency of chirp*/
+
+void setPeakChirp(pulseStruct *pulse)
+{
+  int i=0,numb=0;
+  int startInd=0;
+  int status=0;
+  int gsl_fft_complex_radix2_forward(gsl_complex_packed_array,size_t,size_t);
+  float maxAmp=0,thresh=0.0;
+  float *absData=NULL;
+  double *data=NULL;
+  char hasStarted=0;
+
+
+  /*copy data to correct type*/
+  numb=pow(2.0,(float)((int)(log((float)pulse->nBins)/log(2.0)+0.5)+1));
+  data=dalloc(numb*2,"double pulse",0);
+  for(i=0;i<pulse->nBins;i++){
+    data[2*i]=(double)pulse->y[i];
+    data[2*i+1]=0.0;
+  }
+  for(;i<2*numb;i++)data[i]=0.0;
+
+  /*apply FFT to pulse*/
+  status=gsl_fft_complex_radix2_forward((gsl_complex_packed_array)data,1,(size_t)numb);
+
+  /*get absolute value*/
+  absData=falloc(numb,"absolute FFT pulse",0);
+  maxAmp=0.0;
+  for(i=0;i<numb;i++){
+    absData[i]=sqrt(data[2*i]*data[2*i]+data[2*i+1]*data[2*i+1]);
+    if(absData[i]>maxAmp)maxAmp=absData[i];
+  }
+  TIDY(data);
+
+  /*determine bin of crossing point*/
+  thresh=maxAmp/2.0;
+  hasStarted=0;
+  for(i=0;i<numb/2;i++){
+    if(!hasStarted){
+      if(absData[i]>=thresh)hasStarted=1;
+      startInd=i;
+    }else{
+      if(absData[i]<=thresh)break;
+    }
+  }
+  TIDY(absData);
+
+  /*scale to frequency*/
+  pulse->peakFreq=(float)i/(float)(numb/2)*(2.998*pow(10,8))/pulse->pRes;
+  fprintf(stdout,"Pulse peak frequency is %.2f MHz\n",pulse->peakFreq/1000000.0);
+
+  return;
+}/*setPeakChirp*/
 
 
 /*####################################*/
@@ -3321,6 +3390,7 @@ void readSimPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
     }
   }
   gediIO->pRes=fabs(gediIO->pulse->x[gediIO->pulse->nBins-1]-gediIO->pulse->x[0])/(float)(gediIO->pulse->nBins-1);
+  gediIO->pulse->pRes=gediIO->pRes;
 
   /*determine maximum to centre and total to normalise*/
   tot=0.0;

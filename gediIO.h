@@ -40,12 +40,14 @@ typedef struct{
   int centBin;  /*peak bin*/
   float *y;
   float *x;
+  float pRes;
 
   /*resampled pulse, for PCL*/
   float *resamp;  /*resampled pulse for speed*/
   float *pclSmoo; /*smoothed PCL pulse*/
   int rBins;      /*number of resampled bins*/
   int rCent;      /*resampled centre*/
+  float peakFreq; /*peak frequency*/
 }pulseStruct;
 
 
@@ -369,6 +371,7 @@ void setBeamsToUse(char *,char *);
 void setBeamsToSkip(char *,char *);
 void setBeamsToRead(char *,char *);
 void modifyGroundRho(dataStruct *,float);
+void setPeakChirp(pulseStruct *);
 wFrontStruct *copyFrontFilename(char *);
 float waveformTrueCover(dataStruct *,gediIOstruct *,float);
 float findBlairSense(dataStruct *,gediIOstruct *);
