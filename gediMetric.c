@@ -548,7 +548,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   /*save covers and widths*/
   dimage->snr->cov[numb]=data->cov;
   if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*for PCL pulse, use theoretical peak frequency*/
-    fwhm=2.998*100000000.0/dimage->gediIO.pulse->peakFreq;
+    fwhm=2.998*100000000.0/dimage->gediIO.pulse->peakFreq;  /*theoretical ground FWHM after cross-correlation*/
     dimage->snr->gWidth[numb]=fwhm/2.35482;  /*convert FWHM to stdev*/
   }else dimage->snr->gWidth[numb]=data->gStdev;   /*read pulse stdev*/
 
