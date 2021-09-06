@@ -527,6 +527,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   int i=0,j=0,minWidth=0;
   int eBin=0,sBin=0;
   int histBins=0;
+  float fwhm=0;
   float sWidth=0,gWidth=0;
   float *smoothed=NULL,meanNoise=0;
   float *smooGr=NULL,hOffset=0;
@@ -546,8 +547,10 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
   /*save covers and widths*/
   dimage->snr->cov[numb]=data->cov;
-  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl)dimage->snr->gWidth[numb]=(0.15>data->res)?0.15:data->res;
-  else                                            dimage->snr->gWidth[numb]=data->gStdev;
+  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*for PCL pulse, use theoretical peak frequency*/
+    fwhm=2.998*100000000.0/dimage->gediIO.pulse->peakFreq;
+    dimage->snr->gWidth[numb]=fwhm/2.35482;  /*convert FWHM to stdev*/
+  }else dimage->snr->gWidth[numb]=data->gStdev;   /*read pulse stdev*/
 
   /*loop over smoothing widths*/
   for(j=0;j<dimage->snr->nSig;j++){
