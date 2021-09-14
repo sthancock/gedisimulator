@@ -537,7 +537,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   float *noiseHist=NULL,minHist=0,maxHist=0,histRes=0;
   float snrPosThresh(float *,float,float,int,float,float);
   float snrNegThresh(float *,float,float,int,float,float,float,float,float *);
-  float snrBeamSense(float,float,float,float *,int,float,float,float *,float,float);
+  float snrBeamSense(float,float,float,float *,int,float,float,float *,float,float,int);
   float snrLinkMarginPCL(float,float,float,float,float,float *,int,float);
   float snrLinkMargin(float,float *,float,int,dataStruct *);
   void allocateSNR(control *);
@@ -586,7 +586,9 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
       }
 
      /*beam sense from ground amplitude*/
-     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise,data->noised,dimage->rhoRatio,hOffset);
+     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],\
+                      data->nBins,data->res,meanNoise,data->noised,dimage->rhoRatio,hOffset,\
+                      (int)(dimage->gediIO.pclPhoton+dimage->gediIO.photonWave)*(int)dimage->photonCount.designval);
 
       TIDY(noiseHist);
     }/*min width loop*/
@@ -655,11 +657,12 @@ float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins
 /*####################################################*/
 /*find beam sensitivity for SNR*/
 
-float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,float rhoRatio,float hOffset)
+float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,float rhoRatio,float hOffset,int nPhotons)
 {
   int i=0;
   float gInt=0,totN=0.0,cInt=0;
   float bSense=0,A=0;
+  float pProb=0.9;   /*minimum acceptable photon prob*/
 
   /*find integral*/
   totN=0.0;
@@ -670,6 +673,13 @@ float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float 
   /*integral for threshold*/
   A=(falseNegThresh+falsePosThresh-meanNoise)/hOffset;
   gInt=A*gWidth*sqrt(2.0*M_PI);  /*not sure where the 2.0 comes from??*/
+
+  if(nPhotons>0){  /*if photon counting, do not allow less than 90% chance of whole photon*/
+    if((gInt/totN)<(pProb/(float)nPhotons)){
+      gInt=totN*pProb/(float)nPhotons;
+    }
+  }
+
   cInt=totN-gInt;
   bSense=cInt/(cInt+gInt*rhoRatio);
 
