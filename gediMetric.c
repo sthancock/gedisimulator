@@ -14,6 +14,7 @@
 #include "gediNoise.h"
 #include "time.h"
 
+
 #define USEPHOTON
 
 #ifdef USEPHOTON
@@ -526,6 +527,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   int i=0,j=0,minWidth=0;
   int eBin=0,sBin=0;
   int histBins=0;
+  float fwhm=0;
   float sWidth=0,gWidth=0;
   float *smoothed=NULL,meanNoise=0;
   float *smooGr=NULL,hOffset=0;
@@ -535,7 +537,7 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
   float *noiseHist=NULL,minHist=0,maxHist=0,histRes=0;
   float snrPosThresh(float *,float,float,int,float,float);
   float snrNegThresh(float *,float,float,int,float,float,float,float,float *);
-  float snrBeamSense(float,float,float,float *,int,float,float,float *,float,float);
+  float snrBeamSense(float,float,float,float *,int,float,float,float *,float,float,int);
   float snrLinkMarginPCL(float,float,float,float,float,float *,int,float);
   float snrLinkMargin(float,float *,float,int,dataStruct *);
   void allocateSNR(control *);
@@ -545,8 +547,10 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
 
   /*save covers and widths*/
   dimage->snr->cov[numb]=data->cov;
-  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl)dimage->snr->gWidth[numb]=(0.15>data->res)?0.15:data->res;
-  else                                            dimage->snr->gWidth[numb]=data->gStdev;
+  if(dimage->gediIO.pclPhoton||dimage->gediIO.pcl){  /*for PCL pulse, use theoretical peak frequency*/
+    fwhm=2.998*100000000.0/dimage->gediIO.pulse->peakFreq;  /*theoretical ground FWHM after cross-correlation*/
+    dimage->snr->gWidth[numb]=fwhm/2.35482;  /*convert FWHM to stdev*/
+  }else dimage->snr->gWidth[numb]=data->gStdev;   /*read pulse stdev*/
 
   /*loop over smoothing widths*/
   for(j=0;j<dimage->snr->nSig;j++){
@@ -582,7 +586,9 @@ void calculateSNR(control *dimage,dataStruct *data,int numb)
       }
 
      /*beam sense from ground amplitude*/
-     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],data->nBins,data->res,meanNoise,data->noised,dimage->rhoRatio,hOffset);
+     dimage->snr->bSense[i][j][numb]=snrBeamSense(falsePosThresh,falseNegThresh,gWidth,data->wave[data->useType],\
+                      data->nBins,data->res,meanNoise,data->noised,dimage->rhoRatio,hOffset,\
+                      (int)(dimage->gediIO.pclPhoton+dimage->gediIO.photonWave)*(int)dimage->photonCount.designval);
 
       TIDY(noiseHist);
     }/*min width loop*/
@@ -651,11 +657,12 @@ float snrLinkMargin(float falsePosThresh,float *smooGr,float meanNoise,int nBins
 /*####################################################*/
 /*find beam sensitivity for SNR*/
 
-float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,float rhoRatio,float hOffset)
+float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float *wave,int nBins,float res,float meanNoise,float *noised,float rhoRatio,float hOffset,int nPhotons)
 {
   int i=0;
   float gInt=0,totN=0.0,cInt=0;
   float bSense=0,A=0;
+  float pProb=0.9;   /*minimum acceptable photon prob*/
 
   /*find integral*/
   totN=0.0;
@@ -666,6 +673,13 @@ float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float 
   /*integral for threshold*/
   A=(falseNegThresh+falsePosThresh-meanNoise)/hOffset;
   gInt=A*gWidth*sqrt(2.0*M_PI);  /*not sure where the 2.0 comes from??*/
+
+  if(nPhotons>0){  /*if photon counting, do not allow less than 90% chance of whole photon*/
+    if((gInt/totN)<(pProb/(float)nPhotons)){
+      gInt=totN*pProb/(float)nPhotons;
+    }
+  }
+
   cInt=totN-gInt;
   bSense=cInt/(cInt+gInt*rhoRatio);
 
@@ -2345,7 +2359,7 @@ control *readCommands(int argc,char **argv)
         dimage->gediIO.inList=NULL;
         dimage->gediIO.nFiles=1;
         dimage->gediIO.inList=chChalloc(dimage->gediIO.nFiles,"input name list",0);
-        dimage->gediIO.inList[0]=challoc((uint64_t)strlen(argv[++i])+10,"input name list",0);
+        dimage->gediIO.inList[0]=challoc((uint64_t)strlen(argv[++i])+30,"input name list",0);
         strcpy(&(dimage->gediIO.inList[0][0]),argv[i]);
       }else if(!strncasecmp(argv[i],"-inList",7)){
         checkArguments(1,i,argc,"-inList");

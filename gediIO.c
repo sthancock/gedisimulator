@@ -14,6 +14,7 @@
 #include "gediIO.h"
 #include "gediNoise.h"
 #include "ogr_srs_api.h"
+#include "gsl/gsl_fft_complex.h"
 
 
 /*tolerances*/
@@ -1014,11 +1015,50 @@ void rearrangePulsetoTX(gediIOstruct *gediIO,gediHDF *hdfData,TXstruct *tx)
   int i=0,j=0;
   int *contN=NULL;
   int buff=0;
-  float *txwave=NULL;
+  int nPbins=0;
+  float pRes=0,res=0;         /*pulse and wave resolution*/
+  float *pulse=NULL,*pX=NULL; /*pointers to pulse amplitude and x*/
+  float *setPx(float,int);
+  float *txwave=NULL;         /*resamped pulse*/
+  gediRatStruct gediRat;
+
+
+  /*set pointers to piulse, depending on where it is defined*/
+  if(gediIO->pulse){             /*pulse is defined in the sim settings*/
+    pRes=gediIO->pRes;
+    nPbins=gediIO->pulse->nBins;
+    pulse=gediIO->pulse->y;
+    pX=gediIO->pulse->x;
+    res=gediIO->res;
+  }else if(hdfData->pulse){      /*pulse is defined in a HDF file*/
+    pRes=hdfData->pRes;
+    nPbins=hdfData->nPbins;
+    pulse=hdfData->pulse;
+    pX=setPx(pRes,nPbins);
+    res=(hdfData->z0[0]-hdfData->zN[0])/(float)(hdfData->nBins[0]-1);
+  }else if(hdfData->pSigma>0.0){ /*pulse is Gaussian and needs defining*/
+    /*set pulse*/
+    gediIO->pSigma=hdfData->pSigma;
+    gediIO->readPulse=0;
+    gediRat.iThresh=0.0006;
+    gediIO->res=(hdfData->z0[0]-hdfData->zN[0])/(float)(hdfData->nBins[0]-1);
+    gediIO->pRes=gediIO->res;
+    setGediPulse(gediIO,&gediRat);
+    /*set pointers*/
+    pRes=gediIO->pRes;
+    nPbins=gediIO->pulse->nBins;
+    pulse=gediIO->pulse->y;
+    pX=gediIO->pulse->x;
+    res=gediIO->res;
+  }else{
+    fprintf(stderr,"No pulse defined. Cannot write L1B format without pulse.\n");
+    exit(1);
+  }
+
 
   /*resample the resolution*/
-  buff=50;   /*pad before and after the TX wave incase the L2A code needs some workspace*/
-  tx->nBins=(uint16_t)((float)gediIO->pulse->nBins*gediIO->pRes/gediIO->res)+(uint16_t)(2*buff);
+  buff=50;   /*pad before and after the TX wave in case the L2A code needs some workspace*/
+  tx->nBins=(uint16_t)((float)nPbins*pRes/res)+(uint16_t)(2*buff);
 
   /*allocate space*/
   if(!(tx->txCount=(uint16_t *)calloc(hdfData->nWaves,sizeof(uint16_t)))){
@@ -1042,34 +1082,55 @@ void rearrangePulsetoTX(gediIOstruct *gediIO,gediHDF *hdfData,TXstruct *tx)
     contN[i]=0;
   }
 
+
   /*count up*/
-  for(i=0;i<gediIO->pulse->nBins;i++){
-    j=(int)(gediIO->pulse->x[i]/gediIO->res)+buff;
-    if((j>=0)&&(j<(int)tx->nBins)){
-      txwave[j]+=gediIO->pulse->y[i];
-      contN[j]++;
-    }
-  }
 
-  /*normalise*/
-  tx->maxAmp=0.0;
-  for(i=0;i<(int)tx->nBins;i++){
-    if(contN[i]>0){
-      txwave[i]/=(float)contN[i];
-      if(txwave[i]>tx->maxAmp)tx->maxAmp=txwave[i];
+    for(i=0;i<nPbins;i++){
+      j=(int)(pX[i]/res)+buff;
+      if((j>=0)&&(j<(int)tx->nBins)){
+        txwave[j]+=pulse[i];
+        contN[j]++;
+      }
     }
-  }
 
-  /*populate arrays*/
-  for(i=0;i<hdfData->nWaves;i++){
-    tx->txCount[i]=tx->nBins;
-    tx->txStart[i]=(uint64_t)i*(uint64_t)tx->nBins;
-    memcpy(&(tx->txwave[i*(int)tx->nBins]),&(txwave[0]),sizeof(float)*tx->nBins);
-  }
-  TIDY(txwave);
+    /*normalise*/
+    tx->maxAmp=0.0;
+    for(i=0;i<(int)tx->nBins;i++){
+      if(contN[i]>0){
+        txwave[i]/=(float)contN[i];
+        if(txwave[i]>tx->maxAmp)tx->maxAmp=txwave[i];
+      }
+    }
+
+    /*populate arrays*/
+    for(i=0;i<hdfData->nWaves;i++){
+      tx->txCount[i]=tx->nBins;
+      tx->txStart[i]=(uint64_t)i*(uint64_t)tx->nBins;
+      memcpy(&(tx->txwave[i*(int)tx->nBins]),&(txwave[0]),sizeof(float)*tx->nBins);
+    }
+    TIDY(txwave);
+
+
+
+
 
   return;
 }/*rearrangePulsetoTX*/
+
+
+/*####################################################*/
+/*set the x array for a pulse*/
+
+float *setPx(float pRes,int nPbins)
+{
+  int i=0;
+  float *pX=NULL;
+
+  pX=falloc(nPbins,"pulse x",0);
+  for(i=0;i<nPbins;i++)pX[i]=(float)i*pRes;
+
+  return(pX);
+}/*setPx*/
 
 
 /*####################################################*/
@@ -2174,8 +2235,13 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
     }
     gediIO->pulse->y=hdfGedi[0]->pulse;
     gediIO->pulse->nBins=hdfGedi[0]->nPbins;
-    gediIO->pRes=hdfGedi[0]->pRes;
+    gediIO->pRes=gediIO->pulse->pRes=hdfGedi[0]->pRes;
     gediIO->pulse->x=setPulseRange(gediIO);
+
+    /*if doing PCL, find peak frequency*/
+    if((gediIO->pcl||gediIO->pclPhoton)&&(gediIO->pulse!=NULL)){
+      setPeakChirp(gediIO->pulse);
+    }/*peak frequency if needed*/
 
     /*and copy in to denoising structure*/
     gediIO->den->pBins=gediIO->pulse->nBins;
@@ -3215,8 +3281,71 @@ void setGediPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
     readSimPulse(gediIO,gediRat);
   }
 
+  /*determine peak frequency if needed*/
+  if((gediIO->pcl||gediIO->pclPhoton)&&(gediIO->pulse!=NULL)){
+    setPeakChirp(gediIO->pulse);
+  }/*peak frequency if needed*/
+
+
   return;
 }/*setGediPulse*/
+
+
+/*####################################*/
+/*set peak frequency of chirp*/
+
+void setPeakChirp(pulseStruct *pulse)
+{
+  int i=0,numb=0;
+  int startInd=0;
+  int status=0;
+  int gsl_fft_complex_radix2_forward(gsl_complex_packed_array,size_t,size_t);
+  float maxAmp=0,thresh=0.0;
+  float *absData=NULL;
+  double *data=NULL;
+  char hasStarted=0;
+
+
+  /*copy data to correct type*/
+  numb=pow(2.0,(float)((int)(log((float)pulse->nBins)/log(2.0)+0.5)+1));
+  data=dalloc(numb*2,"double pulse",0);
+  for(i=0;i<pulse->nBins;i++){
+    data[2*i]=(double)pulse->y[i];
+    data[2*i+1]=0.0;
+  }
+  for(;i<2*numb;i++)data[i]=0.0;
+
+  /*apply FFT to pulse*/
+  status=gsl_fft_complex_radix2_forward((gsl_complex_packed_array)data,1,(size_t)numb);
+
+  /*get absolute value*/
+  absData=falloc(numb,"absolute FFT pulse",0);
+  maxAmp=0.0;
+  for(i=0;i<numb;i++){
+    absData[i]=sqrt(data[2*i]*data[2*i]+data[2*i+1]*data[2*i+1]);
+    if(absData[i]>maxAmp)maxAmp=absData[i];
+  }
+  TIDY(data);
+
+  /*determine bin of crossing point*/
+  thresh=maxAmp/2.0;
+  hasStarted=0;
+  for(i=0;i<numb/2;i++){
+    if(!hasStarted){
+      if(absData[i]>=thresh)hasStarted=1;
+      startInd=i;
+    }else{
+      if(absData[i]<=thresh)break;
+    }
+  }
+  TIDY(absData);
+
+  /*scale to frequency*/
+  pulse->peakFreq=(float)i/(float)(numb/2)*(2.998*pow(10,8))/pulse->pRes;
+  fprintf(stdout,"Pulse peak frequency is %.2f MHz\n",pulse->peakFreq/1000000.0);
+
+  return;
+}/*setPeakChirp*/
 
 
 /*####################################*/
@@ -3261,6 +3390,7 @@ void readSimPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
     }
   }
   gediIO->pRes=fabs(gediIO->pulse->x[gediIO->pulse->nBins-1]-gediIO->pulse->x[0])/(float)(gediIO->pulse->nBins-1);
+  gediIO->pulse->pRes=gediIO->pRes;
 
   /*determine maximum to centre and total to normalise*/
   tot=0.0;
