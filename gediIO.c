@@ -2238,6 +2238,14 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
     gediIO->pRes=gediIO->pulse->pRes=hdfGedi[0]->pRes;
     gediIO->pulse->x=setPulseRange(gediIO);
 
+    /*allocate denoising structure if needed*/
+    if(gediIO->den==NULL){
+      if(!(gediIO->den=(denPar *)calloc(1,sizeof(denPar)))){
+        fprintf(stderr,"error denoising parameter allocation.\n");
+        exit(1);
+      }
+    }
+
     /*if doing PCL, find peak frequency*/
     if((gediIO->pcl||gediIO->pclPhoton)&&(gediIO->pulse!=NULL)){
       setPeakChirp(gediIO->pulse);
