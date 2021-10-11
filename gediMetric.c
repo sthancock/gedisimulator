@@ -672,7 +672,7 @@ float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float 
 
   /*integral for threshold*/
   A=(falseNegThresh+falsePosThresh-meanNoise)/hOffset;
-  gInt=A*gWidth*sqrt(2.0*M_PI);  /*not sure where the 2.0 comes from??*/
+  gInt=A*gWidth*sqrt(2.0*M_PI);  /*THIS used to read, but no more. "not sure where the 2.0 comes from??"*/
 
   if(nPhotons>0){  /*if photon counting, do not allow less than 90% chance of whole photon*/
     if((gInt/totN)<(pProb/(float)nPhotons)){
