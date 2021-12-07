@@ -424,7 +424,7 @@ class gediData(object):
       self.z=np.linspace(self.Z0[i],self.ZN[i],num=self.nBins)
 
       # determine noise for scaling ground return
-      reflScale,meanN,stdev=self.meanNoise(i,statsLen=0)
+      reflScale,meanN,stdev=self.meanNoise(i,statsLen=10)
       # find bounds
       minX,maxX=self.findBounds(meanN,stdev,i)
       # plot it
