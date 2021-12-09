@@ -504,6 +504,6 @@ Gnu Public License
 
 ### Who do I talk to? ###
 
-Questions can be posted on this [Google group]((https://groups.google.com/g/gedisim) and answers found.
+Questions can be posted on this [Google group](https://groups.google.com/g/gedisim) and answers found.
 
 svenhancock@gmail.com
