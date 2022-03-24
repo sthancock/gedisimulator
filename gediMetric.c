@@ -685,9 +685,11 @@ float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float 
     cInt=totN-gInt;
     bSense=cInt/(cInt+gInt*rhoRatio);
 
+    #ifdef DEBUG
     if(isinf(bSense)||(bSense<TOL)){
       fprintf(stderr,"Infinite cInt %f gInt %f totN %f falseNegThresh %f falsePosThresh %f meanNoise %f hOffset %f gWidth %f\n",cInt,gInt,totN,falseNegThresh,falsePosThresh,meanNoise,hOffset,gWidth);
     }
+    #endif
 
   }else{
     bSense=0.0;
