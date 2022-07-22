@@ -75,27 +75,35 @@ void addNoise(dataStruct *data,noisePar *gNoise,float fSigma,float pSigma,float 
       exit(1);
     }
     deleteGround(data->noised,tempWave,data->ground[data->useType],data->nBins,gNoise->minGap,pSigma,fSigma,res,data->cov,rhoc,rhog);
-  }else if(gNoise->linkNoise){   /*link margin based noise*/
-    /*Gaussian noise*/
+  }else if(gNoise->linkNoise){   /*link margin based Gaussian noise*/
+
+    /*array to hold Gaussian noise*/
     tempNoise=falloc((uint64_t)data->nBins,"temp noised",0);
+
     /*in case of PCL, subtract min*/
     minE=1000000.0;
     for(i=0;i<data->nBins;i++)if(data->wave[data->useType][i]<minE)minE=data->wave[data->useType][i];
     if(minE>0.0)minE=0.0;
     tot=0.0;
     for(i=0;i<data->nBins;i++)tot+=(data->wave[data->useType][i]-minE)*res;
-    reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);
+
+    /*apply noise*/
+    reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
     for(i=0;i<data->nBins;i++)tempNoise[i]=gNoise->linkSig*GaussNoise()*reflScale;
+
     /*smooth noise by detector response*/
     smooNoise=smooth(gNoise->deSig,data->nBins,tempNoise,res);
     for(i=0;i<data->nBins;i++)tempNoise[i]=tempWave[i]+smooNoise[i];
     TIDY(smooNoise);
-    /*scale to match sigma*/
+
+    /*scale relative SNR derived sigma to match prescribed sigma*/
     scaleNoiseDN(tempNoise,data->nBins,gNoise->linkSig*reflScale,gNoise->trueSig,gNoise->offset);
-    /*digitise*/
+
+    /*digitise to match DN to needed dynamic range*/
     TIDY(data->noised);
     data->noised=digitiseWave(tempNoise,data->nBins,gNoise->bitRate,gNoise->maxDN,tot);
     TIDY(tempNoise);
+
   }else if((gNoise->nSig>0.0)||(gNoise->meanN>0.0)){   /*mean and stdev based noise*/
     for(i=0;i<data->nBins;i++){
       noise=gNoise->nSig*GaussNoise();
