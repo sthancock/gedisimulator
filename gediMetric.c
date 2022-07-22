@@ -418,6 +418,7 @@ int main(int argc,char **argv)
   TIDY(metric);
   if(dimage){
     if(dimage->snr)tidySNR(dimage);
+    dimage->noise.noiseDist=clearNoiseDist(dimage->noise.noiseDist);
     if(dimage->lvisL2){
       TIDY(dimage->lvisL2->lfid);
       TIDY(dimage->lvisL2->shotN);
@@ -2268,6 +2269,8 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.linkPsig=dimage->gediIO.pSigma; /*pulse length*/
   dimage->gediIO.linkFsig=5.5;      /*footprint width*/
   dimage->noise.trueSig=5.0;
+  dimage->noise.skew=0.0;
+  dimage->noise.noiseDist=NULL;
   dimage->noise.deSig=0.0; //0.1; //4.0*0.15/2.355;
   dimage->noise.bitRate=12;
   dimage->noise.maxDN=4096.0; //1.0/(dimage->pSigma*sqrt(2.0*M_PI));
@@ -2489,6 +2492,9 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-trueSig",8)){
         checkArguments(1,i,argc,"-trueSig");
         dimage->noise.trueSig=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-nSkew",8)){
+        checkArguments(1,i,argc,"-nSkew");
+        dimage->noise.skew=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-missGround",11)){
         dimage->noise.missGround=1;
       }else if(!strncasecmp(argv[i],"-minGap",7)){
@@ -2691,6 +2697,7 @@ void writeHelp()
 -linkFsig sig;    footprint width to use when calculating and applying signal noise\n\
 -linkPsig sig;    pulse width to use when calculating and applying signal noise\n\
 -trueSig sig;     true sigma of background noise\n\
+-nSkew s;         skewness of  background noise\n\
 -bitRate n;       digitisation bit rate\n\
 -maxDN max;       maximum DN\n\
 -renoise;         remove noise from truth before applying new noise level\n\

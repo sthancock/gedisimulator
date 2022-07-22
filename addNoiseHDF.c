@@ -92,6 +92,7 @@ int main(int argc,char **argv)
   /*tidy up*/
   hdfGedi=tidyGediHDF(hdfGedi);
   if(dimage){
+    dimage->noise.noiseDist=clearNoiseDist(dimage->noise.noiseDist);
     TIDY(dimage);
     dimage=NULL;
   }
@@ -213,6 +214,8 @@ control *readCommands(int argc,char **argv)
   dimage->noise.shotNoise=0;
   dimage->noise.missGround=0;
   dimage->noise.trueSig=5.0;
+  dimage->noise.skew=0.0;
+  dimage->noise.noiseDist=NULL;
   dimage->noise.maxDN=4096.0;
   dimage->noise.offset=94.0;
   dimage->noise.deSig=0.0;
@@ -256,6 +259,9 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-trueSig",8)){
         checkArguments(1,i,argc,"-trueSig");
         dimage->noise.trueSig=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-nSkew",8)){
+        checkArguments(1,i,argc,"-nSkew");
+        dimage->noise.skew=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-bitRate",8)){
         checkArguments(1,i,argc,"-bitRate");
         dimage->noise.bitRate=(char)atoi(argv[++i]);
@@ -270,7 +276,7 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-aEPSG");
         dimage->gediIO.aEPSG=atoi(argv[++i]);
       }else if(!strncasecmp(argv[i],"-help",5)){
-        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;    output filename\n-l1b;            write output in L1B format\n-aEPSG epsg;     EPSG code of ALS data if writing in L1B format\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;   footprint width to use when calculating and applying signal noise\n-linkPsig sig;   pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-bitRate n;      DN bit rate\n\n");
+        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;    output filename\n-l1b;            write output in L1B format\n-aEPSG epsg;     EPSG code of ALS data if writing in L1B format\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;   footprint width to use when calculating and applying signal noise\n-linkPsig sig;   pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-nSkew x;     skewness of noise distribution\n-bitRate n;      DN bit rate\n\n");
         exit(1);
       }else{
         fprintf(stderr,"%s: unknown argument on command line: %s\nTry gediRat -help\n",argv[0],argv[i]);

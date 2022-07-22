@@ -36,6 +36,16 @@
 
 
 /*#######################################*/
+/*structure to hold *noise distribution if non-normal*/
+
+typedef struct{
+  int nBins;
+  float *cumul;
+  float *x;
+  float *y;
+}noiseDistStruct;
+
+/*#######################################*/
 /*noise structure*/
 
 typedef struct{
@@ -48,6 +58,7 @@ typedef struct{
   float meanN;     /*mean noise offset*/
   float trueSig;   /*true noise sigma in DN*/
   float nSig;      /*noise sigma*/
+  float skew;      /*noise skew*/
   float offset;   /*waveform DN offset*/
   char bitRate;   /*digitiser bit rate*/
   float maxDN;    /*maximum DN we need to digitise*/
@@ -61,14 +72,17 @@ typedef struct{
   float deSig;     /*detector sigma*/
   float hNoise;    /*hard threshold noise as a fraction of integral*/
   float driftFact; /*apply detector mean drift*/
+  /*noise distribution if non-normal*/
+  noiseDistStruct *noiseDist;
 }noisePar;
 
 /*#######################################*/
 /*function definitions*/
 
 void addNoise(dataStruct *,noisePar *,float,float,float,float,float);
+noiseDistStruct *clearNoiseDist(noiseDistStruct *);
 float setNoiseSigma(float,float,float,float,float,float);
-float GaussNoise();
+float GaussNoise(noisePar *);
 
 /*the end*/
 /*#######################################*/
