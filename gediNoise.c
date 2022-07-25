@@ -368,11 +368,13 @@ float GaussNoise(noisePar *gNoise)
   }else{           /*skewed, search a preset distribution*/
     /*make noise distribution if needed*/
     if(gNoise->noiseDist==NULL)setNoiseDist(gNoise);
+fprintf(stdout,"Skewed\n");
 
     /*if not, draw random number and binary search for cumulative crossing point*/
     x1=(float)rand()/max;
 
     noise=chooseFromDist(x1,gNoise->noiseDist);
+fprintf(stdout,"%f Noise %f\n",x1,noise);
   }/*skewed or even if*/
 
   return(noise);
@@ -453,8 +455,6 @@ void setNoiseDist(noisePar *gNoise)
   /*normalise cumulative*/
 fprintf(stdout,"Here?\n");
   for(i=0;i<gNoise->noiseDist->nBins;i++)gNoise->noiseDist->cumul[i]/=gNoise->noiseDist->cumul[gNoise->noiseDist->nBins-1];
-
-fprintf(stdout,"Bins %n max %f\n",gNoise->noiseDist->nBins,gNoise->noiseDist->cumul[gNoise->noiseDist->nBins-1]);
 
   return;
 }/*setNoiseDist*/
