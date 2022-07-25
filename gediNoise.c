@@ -355,7 +355,7 @@ float GaussNoise(noisePar *gNoise)
 
 
   /*is it skewed?*/
-  if(fabs(gNoise->skew)<TOL){  /*use Box approximation to Gaussian random number*/
+  if(gNoise&&(fabs(gNoise->skew)<TOL)){  /*use Box approximation to Gaussian random number*/
     w=0.0;
     do{
       x1=2.0*(float)rand()/max-1.0;
