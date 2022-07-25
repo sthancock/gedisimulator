@@ -43,6 +43,7 @@ typedef struct{
   float *cumul;
   float *x;
   float *y;
+  float res;
 }noiseDistStruct;
 
 /*#######################################*/

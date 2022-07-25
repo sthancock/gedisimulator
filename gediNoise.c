@@ -11,6 +11,8 @@
 #include "gediIO.h"
 #include "gediNoise.h"
 //#include "gsl/gsl_cdf_gaussian_P.h"
+#include "gsl/gsl_cdf.h"
+
 
 
 /*##############################*/
@@ -46,6 +48,7 @@
 
 
 #define DRIFTTOL 0.000001
+#define TOL 0.00001
 
 /*####################################################*/
 /*add noise to waveform*/
@@ -128,6 +131,8 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   smooNoise=smooth(gNoise->deSig,data->nBins,tempNoise,res);
   for(i=0;i<data->nBins;i++)tempNoise[i]=tempWave[i]+smooNoise[i];
   TIDY(smooNoise);
+
+  /*measure nose stdev here*/
 
   /*scale relative SNR derived sigma to match prescribed sigma*/
   scaleNoiseDN(tempNoise,data->nBins,gNoise->linkSig*reflScale,gNoise->trueSig,gNoise->offset);
@@ -342,6 +347,7 @@ float GaussNoise(noisePar *gNoise)
 {
   float noise=0,max=0;
   float x1=0,x2=0,w=0;
+  float chooseFromDist(float,noiseDistStruct *);
   void setNoiseDist(noisePar *);
 
   if(RAND_MAX>0)max=(float)RAND_MAX;
@@ -349,7 +355,7 @@ float GaussNoise(noisePar *gNoise)
 
 
   /*is it skewed?*/
-  if(fabs(gNoise->skew)<DRIFTTOL){  /*use Box approximation to Gaussian random number*/
+  if(fabs(gNoise->skew)<TOL){  /*use Box approximation to Gaussian random number*/
     w=0.0;
     do{
       x1=2.0*(float)rand()/max-1.0;
@@ -359,17 +365,41 @@ float GaussNoise(noisePar *gNoise)
     w=sqrt((-2.0*log(w))/w);
 
     noise=x1*w;
-  }else{
+  }else{           /*skewed, search a preset distribution*/
     /*make noise distribution if needed*/
     if(gNoise->noiseDist==NULL)setNoiseDist(gNoise);
 
     /*if not, draw random number and binary search for cumulative crossing point*/
     x1=(float)rand()/max;
 
-  }
+    noise=chooseFromDist(x1,gNoise->noiseDist);
+  }/*skewed or even if*/
 
   return(noise);
 }/*GaussNoise*/
+
+
+/*####################################################*/
+/*choose noise value from distribution*/
+
+float chooseFromDist(float val,noiseDistStruct *noiseDist)
+{
+  int midI=0;
+  int s=0,e=0;
+
+  s=0;
+  e=noiseDist->nBins-1;
+
+  do{
+    midI=(e+s)/2;
+
+    if(noiseDist->y[midI]>val)e=midI;
+    else if(noiseDist->y[midI]<val)s=midI;
+
+  }while(((e-s)>1)&&(fabs(noiseDist->y[midI]-val)>TOL));
+
+  return(noiseDist->x[midI]);
+}/*chooseFromDist*/
 
 
 /*####################################################*/
@@ -378,7 +408,8 @@ float GaussNoise(noisePar *gNoise)
 void setNoiseDist(noisePar *gNoise)
 {
   int i=0,centBin=0;
-  float y=0;
+  float y=0,tempX=0;
+  float skewGauss(float,float);
 
   /*allocate space*/
   if(!(gNoise->noiseDist=(noiseDistStruct *)calloc(1,sizeof(noiseDistStruct)))){
@@ -386,11 +417,60 @@ void setNoiseDist(noisePar *gNoise)
     exit(1);
   }
 
-  /*determine the bounds*/
-  //for(i=0;i<
+  gNoise->noiseDist->res=0.01;
+
+  /*determine the bounds, backwards*/
+  tempX=0.0;
+  gNoise->noiseDist->nBins=0;
+  do{
+    y=skewGauss(gNoise->skew,tempX);
+    gNoise->noiseDist->nBins++;
+    tempX-=gNoise->noiseDist->res;
+  }while(y>=TOL);
+  centBin=gNoise->noiseDist->nBins;
+
+  /*determine the bounds, forwards*/
+  tempX=gNoise->noiseDist->res;
+  do{
+    y=skewGauss(gNoise->skew,tempX);
+    gNoise->noiseDist->nBins++;
+    tempX+=gNoise->noiseDist->res;
+  }while(y>=TOL);
+
+  /*allocate space */
+  gNoise->noiseDist->x=falloc(gNoise->noiseDist->nBins,"noise distribution x",0);
+  gNoise->noiseDist->y=falloc(gNoise->noiseDist->nBins,"noise distribution y",0);
+  gNoise->noiseDist->cumul=falloc(gNoise->noiseDist->nBins,"noise cumulative distribution",0);
+
+  /*populate*/
+  for(i=0;i<gNoise->noiseDist->nBins;i++){
+    gNoise->noiseDist->x[i]=(float)(i-centBin)*gNoise->noiseDist->res;
+    gNoise->noiseDist->y[i]=skewGauss(gNoise->skew,gNoise->noiseDist->x[i]);
+    if(i>0)gNoise->noiseDist->cumul[i]=gNoise->noiseDist->cumul[i-1]+gNoise->noiseDist->y[i];
+    else   gNoise->noiseDist->cumul[i]=gNoise->noiseDist->y[i];
+  }
+
+  /*normalise cumulative*/
+fprintf(stdout,"Here?\n");
+  for(i=0;i<gNoise->noiseDist->nBins;i++)gNoise->noiseDist->cumul[i]/=gNoise->noiseDist->cumul[gNoise->noiseDist->nBins-1];
+
+fprintf(stdout,"Bins %n max %f\n",gNoise->noiseDist->nBins,gNoise->noiseDist->cumul[gNoise->noiseDist->nBins-1]);
 
   return;
 }/*setNoiseDist*/
+
+
+/*####################################################*/
+/*skewed gaussian with mode at 0 and stdev=1, A=1*/
+
+float skewGauss(float skew,float x)
+{
+  float y=0;
+
+  y=(float)gaussian((double)x,1.0,0.0)*(float)gsl_cdf_gaussian_P((double)(x*skew),1.0);
+
+  return(y);
+}/*skewGauss*/
 
 
 /*####################################################*/
