@@ -272,8 +272,8 @@ int main(int argc,char **argv)
   /*read command Line*/
   dimage=readCommands(argc,argv);
 
-  /*set link noise if needed*/
-  dimage->noise.linkSig=setNoiseSigma(dimage->noise.linkM,dimage->noise.linkCov,dimage->gediIO.linkPsig,dimage->gediIO.linkFsig,rhoC,rhoG);
+  /*set link noise and periodic noise phase if needed*/
+  dimage->noise.linkSig=setNoiseSigma(&dimage->noise,dimage->gediIO.linkPsig,dimage->gediIO.linkFsig,rhoC,rhoG);
  
   /*set photon rates if needed*/
   #ifdef USEPHOTON
@@ -2262,7 +2262,7 @@ control *readCommands(int argc,char **argv)
   dimage->noise.trueSig=5.0;
   dimage->noise.skew=0.0;
   dimage->noise.noiseDist=NULL;
-  dimage->noise.periodOm=0.0;  /*periodic noise period*/
+  dimage->noise.periodOm=0.6;  /*periodic noise period*/
   dimage->noise.periodAmp=0.0; /*periodic noise amplitude*/
   dimage->noise.periodPha=0.0; /*periodic noise phase*/
   dimage->noise.deSig=0.0; //0.1; //4.0*0.15/2.355;
@@ -2489,6 +2489,12 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-nSkew",8)){
         checkArguments(1,i,argc,"-nSkew");
         dimage->noise.skew=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-nPeriodOm",10)){
+        checkArguments(1,i,argc,"-nPeriodOm");
+        dimage->noise.periodOm=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-nPeriodAmp",11)){
+        checkArguments(1,i,argc,"-nPeriodAmp");
+        dimage->noise.periodAmp=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-missGround",11)){
         dimage->noise.missGround=1;
       }else if(!strncasecmp(argv[i],"-minGap",7)){
@@ -2692,6 +2698,8 @@ void writeHelp()
 -linkPsig sig;    pulse width to use when calculating and applying signal noise\n\
 -trueSig sig;     true sigma of background noise\n\
 -nSkew s;         skewness of  background noise\n\
+-nPeriodAmp a;    periodic noise amplitude\n\
+-nPeriodOm p;     periodic noise wavelength\n\
 -bitRate n;       digitisation bit rate\n\
 -maxDN max;       maximum DN\n\
 -renoise;         remove noise from truth before applying new noise level\n\

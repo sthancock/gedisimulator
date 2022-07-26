@@ -105,6 +105,8 @@ void addNoise(dataStruct *data,noisePar *gNoise,float fSigma,float pSigma,float 
 void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,float rhoc,float rhog,float *tempWave)
 {
   int i=0;
+  float thisSig=0;
+  float sigScale=0;
   float tot=0,minE=0;
   float reflScale=0;
   float *smooNoise=NULL;
@@ -124,7 +126,15 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
 
   /*apply noise*/
   reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
-  for(i=0;i<data->nBins;i++)tempNoise[i]=gNoise->linkSig*GaussNoise(gNoise)*reflScale;
+  sigScale=gNoise->periodAmp*gNoise->linkSig/gNoise->trueSig;
+  thisSig=sqrt(gNoise->linkSig*gNoise->linkSig-gNoise->periodAmp*gNoise->periodAmp*sigScale*sigScale/2.0);    /*to move the calculation out of the loop*/
+  for(i=0;i<data->nBins;i++){
+    tempNoise[i]=thisSig*GaussNoise(gNoise)*reflScale;
+    if(gNoise->periodAmp>YTOL){
+      tempNoise[i]+=gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha)*reflScale;
+      fprintf(stdout,"%f %f\n",thisSig,sigScale);
+    }
+  }
 
   /*smooth noise by detector response*/
   smooNoise=smooth(gNoise->deSig,data->nBins,tempNoise,res);
@@ -148,7 +158,7 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
 /*####################################################*/
 /*calculate sigma for link noise*/
 
-float setNoiseSigma(float linkM,float cov,float pSigma,float fSigma,float rhoc,float rhog)
+float setNoiseSigma(noisePar *noise,float pSigma,float fSigma,float rhoc,float rhog)
 {
   float sig=0;
   float groundAmp=0;
@@ -161,15 +171,18 @@ float setNoiseSigma(float linkM,float cov,float pSigma,float fSigma,float rhoc,f
 
   slope=2.0*M_PI/180.0;
 
-  gRefl=(1.0-cov)*rhoc;
+  gRefl=(1.0-noise->linkCov)*rhoc;
 
   tanSlope=sin(slope)/cos(slope);
   sigEff=sqrt(pSigma*pSigma+fSigma*fSigma*tanSlope*tanSlope);
-  groundAmp=(gRefl/(gRefl+rhoc*cov))/(sigEff*sqrt(2.0*M_PI));  /*normalise by total waveform reflectance*/
+  groundAmp=(gRefl/(gRefl+rhoc*noise->linkCov))/(sigEff*sqrt(2.0*M_PI));  /*normalise by total waveform reflectance*/
 
   probNoise=0.05;
   probMiss=0.1;
-  sig=findSigma(probNoise,probMiss,groundAmp,linkM);
+  sig=findSigma(probNoise,probMiss,groundAmp,noise->linkM);
+
+  /*set periodic noise phase*/
+  if(noise->periodAmp>YTOL)noise->periodPha=(2.0*M_PI/noise->periodOm)*(float)rand()/(float)RAND_MAX;
 
   return(sig);
 }/*setNoiseSigma*/
