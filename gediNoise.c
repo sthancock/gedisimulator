@@ -390,14 +390,14 @@ float chooseFromDist(float val,noiseDistStruct *noiseDist)
   s=0;
   e=noiseDist->nBins-1;
 
+  /*binary search*/
   do{
     midI=(e+s)/2;
+    /*fprintf(stdout,"search %f %f %d %d %d\n",noiseDist->y[midI],val,s,e,midI);*/
+    if(noiseDist->cumul[midI]>val)e=midI;
+    else if(noiseDist->cumul[midI]<val)s=midI;
 
-fprintf(stdout,"search %f %f %d %d %d\n",noiseDist->y[midI],val,s,e,midI);
-    if(noiseDist->y[midI]>val)e=midI;
-    else if(noiseDist->y[midI]<val)s=midI;
-
-  }while(((e-s)>1)&&(fabs(noiseDist->y[midI]-val)>TOL));
+  }while(((e-s)>1)&&(fabs(noiseDist->cumul[midI]-val)>TOL));
 
   return(noiseDist->x[midI]);
 }/*chooseFromDist*/
