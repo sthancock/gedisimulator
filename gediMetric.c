@@ -1900,16 +1900,9 @@ void findWaveExtents(float *processed,double *z,int nBins,double tElev,double bE
 void findSignalBounds(float *processed,double *z,int nBins,double *tElev,double *bElev,control *dimage)
 {
   int i=0;
-  float cumul=0,totE=0;
-
-  /*total energy*/
-  totE=0.0;
-  for(i=nBins-1;i>=0;i--)totE+=processed[i];
 
   /*find top*/
-  cumul=0.0;
   for(i=0;i<nBins;i++){
-    cumul+=processed[i]/totE;
     if(processed[i]>dimage->bThresh){
       *tElev=z[i];
       break;
@@ -1917,9 +1910,7 @@ void findSignalBounds(float *processed,double *z,int nBins,double *tElev,double 
   }/*bin loop*/
 
   /*find bottom*/
-  cumul=0.0;
   for(i=nBins-1;i>=0;i--){
-    cumul+=processed[i]/totE;
     if(processed[i]>dimage->bThresh){
       *bElev=z[i];
       break;
@@ -2271,6 +2262,9 @@ control *readCommands(int argc,char **argv)
   dimage->noise.trueSig=5.0;
   dimage->noise.skew=0.0;
   dimage->noise.noiseDist=NULL;
+  dimage->noise.periodOm=0.0;  /*periodic noise period*/
+  dimage->noise.periodAmp=0.0; /*periodic noise amplitude*/
+  dimage->noise.periodPha=0.0; /*periodic noise phase*/
   dimage->noise.deSig=0.0; //0.1; //4.0*0.15/2.355;
   dimage->noise.bitRate=12;
   dimage->noise.maxDN=4096.0; //1.0/(dimage->pSigma*sqrt(2.0*M_PI));

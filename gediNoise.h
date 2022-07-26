@@ -63,6 +63,10 @@ typedef struct{
   float offset;   /*waveform DN offset*/
   char bitRate;   /*digitiser bit rate*/
   float maxDN;    /*maximum DN we need to digitise*/
+  /*periodicity*/
+  float periodOm;  /*periodic noise period*/
+  float periodAmp; /*periodic noise amplitude*/
+  float periodPha; /*periodic noise phase*/
   /*shot noise*/
   char shotNoise; /*shot noise flag*/
   /*renoising already noised data*/

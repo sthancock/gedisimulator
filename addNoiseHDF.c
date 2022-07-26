@@ -216,6 +216,9 @@ control *readCommands(int argc,char **argv)
   dimage->noise.trueSig=5.0;
   dimage->noise.skew=0.0;
   dimage->noise.noiseDist=NULL;
+  dimage->noise.periodOm=0.0;  /*periodic noise period*/
+  dimage->noise.periodAmp=0.0; /*periodic noise amplitude*/
+  dimage->noise.periodPha=0.0; /*periodic noise phase*/
   dimage->noise.maxDN=4096.0;
   dimage->noise.offset=94.0;
   dimage->noise.deSig=0.0;
