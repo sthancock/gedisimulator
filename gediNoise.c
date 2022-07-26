@@ -127,6 +127,7 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   /*apply noise*/
   reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
   sigScale=gNoise->periodAmp*gNoise->linkSig/gNoise->trueSig;
+  /*stdev of sine amplitude is Amp/sqrt(2)*/
   thisSig=sqrt(gNoise->linkSig*gNoise->linkSig-gNoise->periodAmp*gNoise->periodAmp*sigScale*sigScale/2.0);    /*to move the calculation out of the loop*/
   for(i=0;i<data->nBins;i++){
     tempNoise[i]=thisSig*GaussNoise(gNoise)*reflScale;
