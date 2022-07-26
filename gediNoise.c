@@ -372,7 +372,6 @@ float GaussNoise(noisePar *gNoise)
     /*draw random number and binary search for cumulative crossing point*/
     x1=(float)rand()/max;
     noise=chooseFromDist(x1,gNoise->noiseDist);
-fprintf(stdout,"%f Noise %f\n",x1,noise);
   }/*skewed or even if*/
 
   return(noise);
@@ -452,10 +451,7 @@ void setNoiseDist(noisePar *gNoise)
   }
 
   /*normalise cumulative*/
-  for(i=0;i<gNoise->noiseDist->nBins;i++){
-    gNoise->noiseDist->cumul[i]/=gNoise->noiseDist->cumul[gNoise->noiseDist->nBins-1];
-fprintf(stdout,"nDist %f %f %f\n",gNoise->noiseDist->x[i],gNoise->noiseDist->y[i],gNoise->noiseDist->cumul[i]);
-  }
+  for(i=0;i<gNoise->noiseDist->nBins;i++)gNoise->noiseDist->cumul[i]/=gNoise->noiseDist->cumul[gNoise->noiseDist->nBins-1];
 
   return;
 }/*setNoiseDist*/
