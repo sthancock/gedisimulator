@@ -169,6 +169,12 @@ float setNoiseSigma(noisePar *noise,float pSigma,float fSigma,float rhoc,float r
   float probNoise=0,probMiss=0;
   float findSigma(float,float,float,float);
 
+  /*check that options are physically possible*/
+  if(noise->periodAmp>noise->trueSig){
+    fprintf(stderr,"nPeriodAmp cannot be larger than trueSig: %g %g\nAdjust the noise settings and rerun\n",noise->periodAmp,noise->trueSig);
+    exit(1);
+  }
+
   slope=2.0*M_PI/180.0;
 
   gRefl=(1.0-noise->linkCov)*rhoc;
