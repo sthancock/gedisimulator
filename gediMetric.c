@@ -2698,7 +2698,7 @@ void writeHelp()
 -linkPsig sig;    pulse width to use when calculating and applying signal noise\n\
 -trueSig sig;     true sigma of background noise\n\
 -nSkew s;         skewness of  background noise\n\
--nPeriodAmp a;    periodic noise amplitude\n\
+-nPeriodAmp a;    periodic noise amplitude. MUST be smaller than trueSig\n\
 -nPeriodOm p;     periodic noise wavelength\n\
 -bitRate n;       digitisation bit rate\n\
 -maxDN max;       maximum DN\n\
