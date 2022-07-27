@@ -110,6 +110,7 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   float reflScale=0;
   float *smooNoise=NULL;
   float *tempNoise=NULL;
+  float meanNoise=0;
   float *digitiseWave(float *,int,char,float,float);
   void scaleNoiseDN(float *,int,float,float,float);
 
@@ -123,6 +124,8 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   tot=0.0;
   for(i=0;i<data->nBins;i++)tot+=(wave[i]-minE)*res;
 
+  /*keep track of mean to remove skew*/
+  meanNoise=0.0;
   /*apply noise*/
   reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
   sigScale=gNoise->linkSig/gNoise->trueSig;
@@ -133,6 +136,13 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
     if(gNoise->periodAmp>YTOL){
       tempNoise[i]+=sigScale*gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha);
     }
+    meanNoise+=tempNoise[i];
+  }
+
+  /*check that skew has not affected noise*/
+  meanNoise/=(float)data->nBins;
+  if(fabs(meanNoise)>YTOL){
+    for(i=0;i<data->nBins;i++)tempNoise[i]-=meanNoise;
   }
 
   /*smooth noise by detector response*/
