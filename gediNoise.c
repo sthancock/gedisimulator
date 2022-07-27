@@ -212,8 +212,8 @@ float setNoiseSigma(noisePar *noise,float pSigma,float fSigma,float rhoc,float r
   float findSigma(float,float,float,float);
 
   /*check that options are physically possible*/
-  if(noise->periodAmp>noise->trueSig){
-    fprintf(stderr,"nPeriodAmp cannot be larger than trueSig: %g %g\nAdjust the noise settings and rerun\n",noise->periodAmp,noise->trueSig);
+  if((noise->periodAmp/sqrt(2))>noise->trueSig){
+    fprintf(stderr,"nPeriodAmp/sqrt(2) cannot be larger than trueSig: %g %g\nAdjust the noise settings and rerun\n",noise->periodAmp/sqrt(2),noise->trueSig);
     exit(1);
   }
 
