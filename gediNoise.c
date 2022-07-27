@@ -132,7 +132,7 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   for(i=0;i<data->nBins;i++){
     tempNoise[i]=thisSig*GaussNoise(gNoise)*reflScale;
     if(gNoise->periodAmp>YTOL){
-      tempNoise[i]+=sigScale*gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha)*reflScale;
+      tempNoise[i]+=sigScale*gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha);
     }
   }
 
