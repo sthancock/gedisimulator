@@ -13,7 +13,6 @@
 #include "gsl/gsl_cdf.h"
 
 
-
 /*##############################*/
 /*# Adds noise to simulated    #*/
 /*# GEDI waveforms             #*/
