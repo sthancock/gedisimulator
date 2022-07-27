@@ -135,8 +135,8 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
     tempNoise[i]=thisSig*GaussNoise(gNoise)*reflScale;
     if(gNoise->periodAmp>YTOL){
       tempNoise[i]+=sigScale*gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha);
-      meanNoise+=tempNoise[i];
     }
+    if(gNoise->skew>YTOL)meanNoise+=tempNoise[i];
   }
 
   /*check that skew has not affected noise*/
