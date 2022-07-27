@@ -112,7 +112,8 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   float *tempNoise=NULL;
   float meanNoise=0;
   float *digitiseWave(float *,int,char,float,float);
-  void scaleNoiseDN(float *,int,float,float,float);
+  void scaleNoiseDN(float *,int,float,noisePar *);
+  void rescaleNoiseStdev(float,float *,int);
 
   /*array to hold Gaussian noise*/
   tempNoise=falloc((uint64_t)data->nBins,"temp noised",0);
@@ -136,7 +137,7 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
     if(gNoise->periodAmp>YTOL){
       tempNoise[i]+=sigScale*gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha);
     }
-    if(gNoise->skew>YTOL)meanNoise+=tempNoise[i];
+    if(fabs(gNoise->skew)>YTOL)meanNoise+=tempNoise[i];
   }
 
   /*check that skew has not affected noise*/
@@ -147,13 +148,16 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
 
   /*smooth noise by detector response*/
   smooNoise=smooth(gNoise->deSig,data->nBins,tempNoise,res);
+
+  /*rescale stdev if needed*/
+  if(fabs(gNoise->skew)>YTOL)rescaleNoiseStdev(gNoise->linkSig*reflScale,smooNoise,data->nBins);
+
+  /*apply noise*/
   for(i=0;i<data->nBins;i++)tempNoise[i]=tempWave[i]+smooNoise[i];
   TIDY(smooNoise);
 
-  /*measure noise stdev here*/
-
   /*scale relative SNR derived sigma to match prescribed sigma*/
-  scaleNoiseDN(tempNoise,data->nBins,gNoise->linkSig*reflScale,gNoise->trueSig,gNoise->offset);
+  scaleNoiseDN(tempNoise,data->nBins,gNoise->linkSig*reflScale,gNoise);
 
   /*digitise to match DN to needed dynamic range*/
   TIDY(data->noised);
@@ -162,6 +166,35 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
 
   return;
 }/*applyLinkNoise*/
+
+
+/*####################################################*/
+/*reacle noise standard deviation*/
+
+void rescaleNoiseStdev(float linkSig,float *smooNoise,int nBins)
+{
+  int i=0;
+  float scale=0;
+  float meanN=0,stdev=0;
+
+  /*find mean*/
+  meanN=0.0;
+  for(i=0;i<nBins;i++)meanN+=smooNoise[i];
+  meanN/=(float)nBins;
+
+  /*find stdev*/
+  stdev=0.0;
+  for(i=0;i<nBins;i++)stdev+=(smooNoise[i]-meanN)*(smooNoise[i]-meanN);
+  stdev=sqrt(stdev/(float)nBins);
+
+  if(fabs(stdev-linkSig)>YTOL){
+    scale=linkSig/stdev;
+    for(i=0;i<nBins;i++)smooNoise[i]=(smooNoise[i]-meanN)*scale+meanN;
+  }
+
+
+  return;
+}/*rescaleNoiseStdev*/
 
 
 /*####################################################*/
@@ -354,14 +387,14 @@ float *digitiseWave(float *wave,int nBins,char bitRate,float maxDN,float tot)
 /*####################################################*/
 /*scale noise to match Bryan's numbers*/
 
-void scaleNoiseDN(float *noised,int nBins,float noiseSig,float trueSig,float offset)
+void scaleNoiseDN(float *noised,int nBins,float noiseSig,noisePar *gNoise)
 {
   int i=0;
   float sigScale=0;
 
-  sigScale=trueSig/noiseSig;
+  sigScale=gNoise->trueSig/noiseSig;
 
-  for(i=0;i<nBins;i++)noised[i]=noised[i]*sigScale+offset;
+  for(i=0;i<nBins;i++)noised[i]=noised[i]*sigScale+gNoise->offset;
 
   return;
 }/*scaleNoiseDN*/
