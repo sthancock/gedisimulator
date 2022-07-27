@@ -126,14 +126,13 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
 
   /*apply noise*/
   reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
-  sigScale=gNoise->periodAmp*gNoise->linkSig/gNoise->trueSig;
+  sigScale=gNoise->linkSig/gNoise->trueSig;
   /*stdev of sine amplitude is Amp/sqrt(2)*/
   thisSig=sqrt(gNoise->linkSig*gNoise->linkSig-gNoise->periodAmp*gNoise->periodAmp*sigScale*sigScale/2.0);    /*to move the calculation out of the loop*/
   for(i=0;i<data->nBins;i++){
     tempNoise[i]=thisSig*GaussNoise(gNoise)*reflScale;
     if(gNoise->periodAmp>YTOL){
-      tempNoise[i]+=gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha)*reflScale;
-      fprintf(stdout,"%f %f\n",thisSig,sigScale);
+      tempNoise[i]+=sigScale*gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha)*reflScale;
     }
   }
 
@@ -142,7 +141,7 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   for(i=0;i<data->nBins;i++)tempNoise[i]=tempWave[i]+smooNoise[i];
   TIDY(smooNoise);
 
-  /*measure nose stdev here*/
+  /*measure noise stdev here*/
 
   /*scale relative SNR derived sigma to match prescribed sigma*/
   scaleNoiseDN(tempNoise,data->nBins,gNoise->linkSig*reflScale,gNoise->trueSig,gNoise->offset);
