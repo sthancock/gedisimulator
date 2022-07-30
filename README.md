@@ -252,6 +252,9 @@ Program to process large-footprint lidar data (real or simulated) and produce st
     -linkFsig sig;    footprint width to use when calculating and applying signal noise
     -linkPsig sig;    pulse width to use when calculating and applying signal noise
     -trueSig sig;     true sigma of background noise
+    -nSkew s;         skewness of  background noise
+    -nPeriodAmp a;    periodic noise amplitude
+    -nPeriodOm p;     periodic noise wavelength
     -bitRate n;       digitisation bit rate
     -maxDN max;       maximum DN
     -renoise;         remove noise from truth before applying new noise level
@@ -504,6 +507,6 @@ Gnu Public License
 
 ### Who do I talk to? ###
 
-Questions can be posted on this [Google group]((https://groups.google.com/g/gedisim) and answers found.
+Questions can be posted on this [Google group](https://groups.google.com/g/gedisim) and answers found.
 
 svenhancock@gmail.com

@@ -272,8 +272,8 @@ int main(int argc,char **argv)
   /*read command Line*/
   dimage=readCommands(argc,argv);
 
-  /*set link noise if needed*/
-  dimage->noise.linkSig=setNoiseSigma(dimage->noise.linkM,dimage->noise.linkCov,dimage->gediIO.linkPsig,dimage->gediIO.linkFsig,rhoC,rhoG);
+  /*set link noise and periodic noise phase if needed*/
+  dimage->noise.linkSig=setNoiseSigma(&dimage->noise,dimage->gediIO.linkPsig,dimage->gediIO.linkFsig,rhoC,rhoG);
  
   /*set photon rates if needed*/
   #ifdef USEPHOTON
@@ -418,6 +418,7 @@ int main(int argc,char **argv)
   TIDY(metric);
   if(dimage){
     if(dimage->snr)tidySNR(dimage);
+    dimage->noise.noiseDist=clearNoiseDist(dimage->noise.noiseDist);
     if(dimage->lvisL2){
       TIDY(dimage->lvisL2->lfid);
       TIDY(dimage->lvisL2->shotN);
@@ -684,6 +685,13 @@ float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float 
 
     cInt=totN-gInt;
     bSense=cInt/(cInt+gInt*rhoRatio);
+
+    #ifdef DEBUG
+    if(isinf(bSense)||(bSense<TOL)){
+      fprintf(stderr,"Infinite cInt %f gInt %f totN %f falseNegThresh %f falsePosThresh %f meanNoise %f hOffset %f gWidth %f\n",cInt,gInt,totN,falseNegThresh,falsePosThresh,meanNoise,hOffset,gWidth);
+    }
+    #endif
+
   }else{
     bSense=0.0;
   }
@@ -1892,16 +1900,9 @@ void findWaveExtents(float *processed,double *z,int nBins,double tElev,double bE
 void findSignalBounds(float *processed,double *z,int nBins,double *tElev,double *bElev,control *dimage)
 {
   int i=0;
-  float cumul=0,totE=0;
-
-  /*total energy*/
-  totE=0.0;
-  for(i=nBins-1;i>=0;i--)totE+=processed[i];
 
   /*find top*/
-  cumul=0.0;
   for(i=0;i<nBins;i++){
-    cumul+=processed[i]/totE;
     if(processed[i]>dimage->bThresh){
       *tElev=z[i];
       break;
@@ -1909,9 +1910,7 @@ void findSignalBounds(float *processed,double *z,int nBins,double *tElev,double 
   }/*bin loop*/
 
   /*find bottom*/
-  cumul=0.0;
   for(i=nBins-1;i>=0;i--){
-    cumul+=processed[i]/totE;
     if(processed[i]>dimage->bThresh){
       *bElev=z[i];
       break;
@@ -2261,6 +2260,11 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.linkPsig=dimage->gediIO.pSigma; /*pulse length*/
   dimage->gediIO.linkFsig=5.5;      /*footprint width*/
   dimage->noise.trueSig=5.0;
+  dimage->noise.skew=0.0;
+  dimage->noise.noiseDist=NULL;
+  dimage->noise.periodOm=0.6;  /*periodic noise period*/
+  dimage->noise.periodAmp=0.0; /*periodic noise amplitude*/
+  dimage->noise.periodPha=0.0; /*periodic noise phase*/
   dimage->noise.deSig=0.0; //0.1; //4.0*0.15/2.355;
   dimage->noise.bitRate=12;
   dimage->noise.maxDN=4096.0; //1.0/(dimage->pSigma*sqrt(2.0*M_PI));
@@ -2482,6 +2486,15 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-trueSig",8)){
         checkArguments(1,i,argc,"-trueSig");
         dimage->noise.trueSig=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-nSkew",8)){
+        checkArguments(1,i,argc,"-nSkew");
+        dimage->noise.skew=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-nPeriodOm",10)){
+        checkArguments(1,i,argc,"-nPeriodOm");
+        dimage->noise.periodOm=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-nPeriodAmp",11)){
+        checkArguments(1,i,argc,"-nPeriodAmp");
+        dimage->noise.periodAmp=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-missGround",11)){
         dimage->noise.missGround=1;
       }else if(!strncasecmp(argv[i],"-minGap",7)){
@@ -2684,6 +2697,9 @@ void writeHelp()
 -linkFsig sig;    footprint width to use when calculating and applying signal noise\n\
 -linkPsig sig;    pulse width to use when calculating and applying signal noise\n\
 -trueSig sig;     true sigma of background noise\n\
+-nSkew s;         skewness of  background noise\n\
+-nPeriodAmp a;    periodic noise amplitude. MUST be smaller than trueSig\n\
+-nPeriodOm p;     periodic noise wavelength\n\
 -bitRate n;       digitisation bit rate\n\
 -maxDN max;       maximum DN\n\
 -renoise;         remove noise from truth before applying new noise level\n\

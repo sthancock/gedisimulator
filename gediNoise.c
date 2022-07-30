@@ -10,6 +10,7 @@
 #include "libOctree.h"
 #include "gediIO.h"
 #include "gediNoise.h"
+#include "gsl/gsl_cdf.h"
 
 
 /*##############################*/
@@ -45,6 +46,7 @@
 
 
 #define DRIFTTOL 0.000001
+#define TOL 0.00001
 
 /*####################################################*/
 /*add noise to waveform*/
@@ -54,14 +56,10 @@ void addNoise(dataStruct *data,noisePar *gNoise,float fSigma,float pSigma,float 
   int i=0;
   float noise=0;
   float tot=0.0,thresh=0;
-  float minE=0;
-  float *tempNoise=NULL;
-  float *smooNoise=NULL,*tempWave=NULL;
-  float *digitiseWave(float *,int,char,float,float);
-  float reflScale=0;
-  void deleteGround(float *,float *,float *,int,float,float,float,float,float,float,float);
-  void scaleNoiseDN(float *,int,float,float,float);
+  float *tempWave=NULL;
   float *detectorDrift(float *,int,float,float);
+  void deleteGround(float *,float *,float *,int,float,float,float,float,float,float,float);
+  void applyLinkNoise(dataStruct *,float *,noisePar *,float,float,float,float *);
 
   /*allocate*/
   data->noised=falloc((uint64_t)data->nBins,"noised wave",0);
@@ -75,30 +73,11 @@ void addNoise(dataStruct *data,noisePar *gNoise,float fSigma,float pSigma,float 
       exit(1);
     }
     deleteGround(data->noised,tempWave,data->ground[data->useType],data->nBins,gNoise->minGap,pSigma,fSigma,res,data->cov,rhoc,rhog);
-  }else if(gNoise->linkNoise){   /*link margin based noise*/
-    /*Gaussian noise*/
-    tempNoise=falloc((uint64_t)data->nBins,"temp noised",0);
-    /*in case of PCL, subtract min*/
-    minE=1000000.0;
-    for(i=0;i<data->nBins;i++)if(data->wave[data->useType][i]<minE)minE=data->wave[data->useType][i];
-    if(minE>0.0)minE=0.0;
-    tot=0.0;
-    for(i=0;i<data->nBins;i++)tot+=(data->wave[data->useType][i]-minE)*res;
-    reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);
-    for(i=0;i<data->nBins;i++)tempNoise[i]=gNoise->linkSig*GaussNoise()*reflScale;
-    /*smooth noise by detector response*/
-    smooNoise=smooth(gNoise->deSig,data->nBins,tempNoise,res);
-    for(i=0;i<data->nBins;i++)tempNoise[i]=tempWave[i]+smooNoise[i];
-    TIDY(smooNoise);
-    /*scale to match sigma*/
-    scaleNoiseDN(tempNoise,data->nBins,gNoise->linkSig*reflScale,gNoise->trueSig,gNoise->offset);
-    /*digitise*/
-    TIDY(data->noised);
-    data->noised=digitiseWave(tempNoise,data->nBins,gNoise->bitRate,gNoise->maxDN,tot);
-    TIDY(tempNoise);
+  }else if(gNoise->linkNoise){   /*link margin based Gaussian noise*/
+    applyLinkNoise(data,data->wave[data->useType],gNoise,res,rhoc,rhog,tempWave);
   }else if((gNoise->nSig>0.0)||(gNoise->meanN>0.0)){   /*mean and stdev based noise*/
     for(i=0;i<data->nBins;i++){
-      noise=gNoise->nSig*GaussNoise();
+      noise=gNoise->nSig*GaussNoise(gNoise);
       if((float)rand()/(float)RAND_MAX<0.5)noise*=-1.0; /*to allow negative numbers*/
       data->noised[i]=tempWave[i]+gNoise->meanN+noise;
     }/*bin loop*/
@@ -118,10 +97,110 @@ void addNoise(dataStruct *data,noisePar *gNoise,float fSigma,float pSigma,float 
   return;
 }/*addNoise*/
 
+
+/*####################################################*/
+/*apply link noise*/
+
+void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,float rhoc,float rhog,float *tempWave)
+{
+  int i=0;
+  float thisSig=0;
+  float sigScale=0;
+  float tot=0,minE=0;
+  float reflScale=0;
+  float *smooNoise=NULL;
+  float *tempNoise=NULL;
+  float meanNoise=0;
+  float *digitiseWave(float *,int,char,float,float);
+  void scaleNoiseDN(float *,int,float,noisePar *);
+  void rescaleNoiseStdev(float,float *,int);
+
+  /*array to hold Gaussian noise*/
+  tempNoise=falloc((uint64_t)data->nBins,"temp noised",0);
+
+  /*in case of PCL, subtract min*/
+  minE=1000000.0;
+  for(i=0;i<data->nBins;i++)if(wave[i]<minE)minE=wave[i];
+  if(minE>0.0)minE=0.0;
+  tot=0.0;
+  for(i=0;i<data->nBins;i++)tot+=(wave[i]-minE)*res;
+
+  /*keep track of mean to remove skew*/
+  meanNoise=0.0;
+  /*apply noise*/
+  reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
+  sigScale=gNoise->linkSig/gNoise->trueSig;
+  /*stdev of sine amplitude is Amp/sqrt(2)*/
+  thisSig=sqrt(gNoise->linkSig*gNoise->linkSig-gNoise->periodAmp*gNoise->periodAmp*sigScale*sigScale/2.0);    /*to move the calculation out of the loop*/
+  for(i=0;i<data->nBins;i++){
+    tempNoise[i]=thisSig*GaussNoise(gNoise)*reflScale;
+    if(gNoise->periodAmp>YTOL){
+      tempNoise[i]+=sigScale*gNoise->periodAmp*sin(res*(float)i*2*M_PI/gNoise->periodOm+gNoise->periodPha);
+    }
+    if(fabs(gNoise->skew)>YTOL)meanNoise+=tempNoise[i];
+  }
+
+  /*check that skew has not affected noise*/
+  meanNoise/=(float)data->nBins;
+  if(fabs(meanNoise)>YTOL){
+    for(i=0;i<data->nBins;i++)tempNoise[i]-=meanNoise;
+  }
+
+  /*smooth noise by detector response*/
+  smooNoise=smooth(gNoise->deSig,data->nBins,tempNoise,res);
+
+  /*rescale stdev if needed*/
+  if(fabs(gNoise->skew)>YTOL)rescaleNoiseStdev(gNoise->linkSig*reflScale,smooNoise,data->nBins);
+
+  /*apply noise*/
+  for(i=0;i<data->nBins;i++)tempNoise[i]=tempWave[i]+smooNoise[i];
+  TIDY(smooNoise);
+
+  /*scale relative SNR derived sigma to match prescribed sigma*/
+  scaleNoiseDN(tempNoise,data->nBins,gNoise->linkSig*reflScale,gNoise);
+
+  /*digitise to match DN to needed dynamic range*/
+  TIDY(data->noised);
+  data->noised=digitiseWave(tempNoise,data->nBins,gNoise->bitRate,gNoise->maxDN,tot);
+  TIDY(tempNoise);
+
+  return;
+}/*applyLinkNoise*/
+
+
+/*####################################################*/
+/*reacle noise standard deviation*/
+
+void rescaleNoiseStdev(float linkSig,float *smooNoise,int nBins)
+{
+  int i=0;
+  float scale=0;
+  float meanN=0,stdev=0;
+
+  /*find mean*/
+  meanN=0.0;
+  for(i=0;i<nBins;i++)meanN+=smooNoise[i];
+  meanN/=(float)nBins;
+
+  /*find stdev*/
+  stdev=0.0;
+  for(i=0;i<nBins;i++)stdev+=(smooNoise[i]-meanN)*(smooNoise[i]-meanN);
+  stdev=sqrt(stdev/(float)nBins);
+
+  if(fabs(stdev-linkSig)>YTOL){
+    scale=linkSig/stdev;
+    for(i=0;i<nBins;i++)smooNoise[i]=(smooNoise[i]-meanN)*scale+meanN;
+  }
+
+
+  return;
+}/*rescaleNoiseStdev*/
+
+
 /*####################################################*/
 /*calculate sigma for link noise*/
 
-float setNoiseSigma(float linkM,float cov,float pSigma,float fSigma,float rhoc,float rhog)
+float setNoiseSigma(noisePar *noise,float pSigma,float fSigma,float rhoc,float rhog)
 {
   float sig=0;
   float groundAmp=0;
@@ -132,17 +211,26 @@ float setNoiseSigma(float linkM,float cov,float pSigma,float fSigma,float rhoc,f
   float probNoise=0,probMiss=0;
   float findSigma(float,float,float,float);
 
+  /*check that options are physically possible*/
+  if((noise->periodAmp/sqrt(2))>noise->trueSig){
+    fprintf(stderr,"nPeriodAmp/sqrt(2) cannot be larger than trueSig: %g %g\nAdjust the noise settings and rerun\n",noise->periodAmp/sqrt(2),noise->trueSig);
+    exit(1);
+  }
+
   slope=2.0*M_PI/180.0;
 
-  gRefl=(1.0-cov)*rhoc;
+  gRefl=(1.0-noise->linkCov)*rhoc;
 
   tanSlope=sin(slope)/cos(slope);
   sigEff=sqrt(pSigma*pSigma+fSigma*fSigma*tanSlope*tanSlope);
-  groundAmp=(gRefl/(gRefl+rhoc*cov))/(sigEff*sqrt(2.0*M_PI));  /*normalise by total waveform reflectance*/
+  groundAmp=(gRefl/(gRefl+rhoc*noise->linkCov))/(sigEff*sqrt(2.0*M_PI));  /*normalise by total waveform reflectance*/
 
   probNoise=0.05;
   probMiss=0.1;
-  sig=findSigma(probNoise,probMiss,groundAmp,linkM);
+  sig=findSigma(probNoise,probMiss,groundAmp,noise->linkM);
+
+  /*set periodic noise phase*/
+  if(noise->periodAmp>YTOL)noise->periodPha=(2.0*M_PI/noise->periodOm)*(float)rand()/(float)RAND_MAX;
 
   return(sig);
 }/*setNoiseSigma*/
@@ -299,14 +387,14 @@ float *digitiseWave(float *wave,int nBins,char bitRate,float maxDN,float tot)
 /*####################################################*/
 /*scale noise to match Bryan's numbers*/
 
-void scaleNoiseDN(float *noised,int nBins,float noiseSig,float trueSig,float offset)
+void scaleNoiseDN(float *noised,int nBins,float noiseSig,noisePar *gNoise)
 {
   int i=0;
   float sigScale=0;
 
-  sigScale=trueSig/noiseSig;
+  sigScale=gNoise->trueSig/noiseSig;
 
-  for(i=0;i<nBins;i++)noised[i]=noised[i]*sigScale+offset;
+  for(i=0;i<nBins;i++)noised[i]=noised[i]*sigScale+gNoise->offset;
 
   return;
 }/*scaleNoiseDN*/
@@ -315,27 +403,131 @@ void scaleNoiseDN(float *noised,int nBins,float noiseSig,float trueSig,float off
 /*####################################################*/
 /*noise from a Gaussian*/
 
-float GaussNoise()
+float GaussNoise(noisePar *gNoise)
 {
   float noise=0,max=0;
   float x1=0,x2=0,w=0;
+  float chooseFromDist(float,noiseDistStruct *);
+  void setNoiseDist(noisePar *);
 
   if(RAND_MAX>0)max=(float)RAND_MAX;
   else          max=-1.0*(float)RAND_MAX;
 
-  /*Box approximation to Gaussian random number*/
-  w=0.0;
-  do{
-    x1=2.0*(float)rand()/max-1.0;
-    x2=2.0*(float)rand()/max-1.0;
-    w=x1*x1+x2*x2;
-  }while(w>=1.0);
-  w=sqrt((-2.0*log(w))/w);
 
-  noise=x1*w;
+  /*is it skewed?*/
+  if(gNoise&&(fabs(gNoise->skew)<TOL)){  /*use Box approximation to Gaussian random number*/
+    w=0.0;
+    do{
+      x1=2.0*(float)rand()/max-1.0;
+      x2=2.0*(float)rand()/max-1.0;
+      w=x1*x1+x2*x2;
+    }while(w>=1.0);
+    w=sqrt((-2.0*log(w))/w);
+
+    noise=x1*w;
+  }else{           /*skewed, search a preset distribution*/
+    /*make noise distribution if needed*/
+    if(gNoise->noiseDist==NULL)setNoiseDist(gNoise);
+
+    /*draw random number and binary search for cumulative crossing point*/
+    x1=(float)rand()/max;
+    noise=chooseFromDist(x1,gNoise->noiseDist);
+  }/*skewed or even if*/
 
   return(noise);
 }/*GaussNoise*/
+
+
+/*####################################################*/
+/*choose noise value from distribution*/
+
+float chooseFromDist(float val,noiseDistStruct *noiseDist)
+{
+  int midI=0;
+  int s=0,e=0;
+
+  s=0;
+  e=noiseDist->nBins-1;
+
+  /*binary search*/
+  do{
+    midI=(e+s)/2;
+    /*fprintf(stdout,"search %f %f %d %d %d\n",noiseDist->y[midI],val,s,e,midI);*/
+    if(noiseDist->cumul[midI]>val)e=midI;
+    else if(noiseDist->cumul[midI]<val)s=midI;
+
+  }while(((e-s)>1)&&(fabs(noiseDist->cumul[midI]-val)>TOL));
+
+  return(noiseDist->x[midI]);
+}/*chooseFromDist*/
+
+
+/*####################################################*/
+/*set a non-normal noise distribution*/
+
+void setNoiseDist(noisePar *gNoise)
+{
+  int i=0,centBin=0;
+  float y=0,tempX=0;
+  float skewGauss(float,float);
+
+  /*allocate space*/
+  if(!(gNoise->noiseDist=(noiseDistStruct *)calloc(1,sizeof(noiseDistStruct)))){
+    fprintf(stderr,"error in noise distribution allocation.\n");
+    exit(1);
+  }
+
+  gNoise->noiseDist->res=0.01;
+
+  /*determine the bounds, backwards*/
+  tempX=0.0;
+  gNoise->noiseDist->nBins=0;
+  do{
+    y=skewGauss(gNoise->skew,tempX);
+    gNoise->noiseDist->nBins++;
+    tempX-=gNoise->noiseDist->res;
+  }while(y>=TOL);
+  centBin=gNoise->noiseDist->nBins;
+
+  /*determine the bounds, forwards*/
+  tempX=gNoise->noiseDist->res;
+  do{
+    y=skewGauss(gNoise->skew,tempX);
+    gNoise->noiseDist->nBins++;
+    tempX+=gNoise->noiseDist->res;
+  }while(y>=TOL);
+
+  /*allocate space */
+  gNoise->noiseDist->x=falloc(gNoise->noiseDist->nBins,"noise distribution x",0);
+  gNoise->noiseDist->y=falloc(gNoise->noiseDist->nBins,"noise distribution y",0);
+  gNoise->noiseDist->cumul=falloc(gNoise->noiseDist->nBins,"noise cumulative distribution",0);
+
+  /*populate*/
+  for(i=0;i<gNoise->noiseDist->nBins;i++){
+    gNoise->noiseDist->x[i]=(float)(i-centBin)*gNoise->noiseDist->res;
+    gNoise->noiseDist->y[i]=skewGauss(gNoise->skew,gNoise->noiseDist->x[i]);
+    if(i>0)gNoise->noiseDist->cumul[i]=gNoise->noiseDist->cumul[i-1]+gNoise->noiseDist->y[i];
+    else   gNoise->noiseDist->cumul[i]=gNoise->noiseDist->y[i];
+  }
+
+  /*normalise cumulative*/
+  for(i=0;i<gNoise->noiseDist->nBins;i++)gNoise->noiseDist->cumul[i]/=gNoise->noiseDist->cumul[gNoise->noiseDist->nBins-1];
+
+  return;
+}/*setNoiseDist*/
+
+
+/*####################################################*/
+/*skewed gaussian with mode at 0 and stdev=1, A=1*/
+
+float skewGauss(float skew,float x)
+{
+  float y=0;
+
+  y=(float)gaussian((double)x,1.0,0.0)*(float)gsl_cdf_gaussian_P((double)(x*skew),1.0);
+
+  return(y);
+}/*skewGauss*/
 
 
 /*####################################################*/
@@ -478,6 +670,22 @@ float *detectorDrift(float *wave,int nBins,float driftFact,float res)
 
   return(tempWave);
 }/*detectorDrift*/
+
+
+/*####################################################*/
+/*clean ouse noise distribution structure*/
+
+noiseDistStruct *clearNoiseDist(noiseDistStruct *noiseDist)
+{
+
+  if(noiseDist){
+    TIDY(noiseDist->cumul);
+    TIDY(noiseDist->x);
+    TIDY(noiseDist->y);
+  }
+
+  return(NULL);
+}/*clearNoiseDist*/
 
 
 /*the end*/

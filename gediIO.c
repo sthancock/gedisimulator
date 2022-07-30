@@ -1296,8 +1296,6 @@ void writeGEDIhdf(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   /*open new file*/
   file=H5Fcreate(namen,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
 
-
-
  /*write header*/
   write1dIntHDF5(file,"NWAVES",&hdfData->nWaves,1);
   write1dIntHDF5(file,"NBINS",&hdfData->nBins[0],1);

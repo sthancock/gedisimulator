@@ -3,6 +3,7 @@
 Script to access simuated GEDI data
 '''
 
+
 ##################################
 import numpy as np
 import h5py
@@ -424,7 +425,7 @@ class gediData(object):
       self.z=np.linspace(self.Z0[i],self.ZN[i],num=self.nBins)
 
       # determine noise for scaling ground return
-      reflScale,meanN,stdev=self.meanNoise(i,statsLen=0)
+      reflScale,meanN,stdev=self.meanNoise(i,statsLen=10)
       # find bounds
       minX,maxX=self.findBounds(meanN,stdev,i)
       # plot it
@@ -498,6 +499,26 @@ class gediData(object):
     totE=np.sum(self.wave[i]-meanN)*self.res
     return(totE,meanN,stdev)
  
+  ###########################################
+
+  def findStats(self,statsLen=10):
+    '''
+    Finds standard deviation and mean of noise
+    for all waveforms
+    '''
+
+    # make empty arrays
+    self.meanNoise=np.empty(self.nWaves)
+    self.stdevNoise=np.empty(self.nWaves)
+
+    # determine number of bins to calculate stats over
+    self.setOneZ(0)
+    noiseBins=int(statsLen/self.res)   # number of bins within "statsLen"
+
+    # loop over waveforms
+    for i in range(0,self.nWaves):
+      self.meanNoise[i]=np.mean(self.wave[i,0:noiseBins])
+      self.stdevNoise[i]=np.std(self.wave[i,0:noiseBins])
 
   ###########################################
 

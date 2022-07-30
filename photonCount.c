@@ -547,7 +547,7 @@ void applyShotNoise(float *temp,int nBins)
       shotSig=sqrt(temp[i]);
 
       /*draw Gaussian random number*/
-      shotNoise=(float)round(GaussNoise()*shotSig);
+      shotNoise=(float)round(GaussNoise(NULL)*shotSig);
 
       /*count truncated negative*/
       temp[i]+=shotNoise;
