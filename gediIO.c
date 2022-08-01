@@ -417,6 +417,7 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   uint16_t *setThUsedL1B(int);
   uint32_t *tempUint32=NULL;
   uint32_t *padUint32zeros(int);
+  uint32_t *setAllSamplesSumL1B(gediHDF *);
   uint64_t *tempUint64=NULL;
   uint64_t *setRXstarts(int,int *);
   uint64_t *setShotNumber(int);
@@ -449,6 +450,9 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   group_id=H5Gcreate2(file,"BEAM0000", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
   /*write the data*/
+  tempUint32=setAllSamplesSumL1B(hdfData);
+  writeComp1dUint32HDF5(group_id,"all_samples_sum",tempUint32,hdfData->nWaves);
+  TIDY(tempUint32);
   tempUint16=padUint16zeros(hdfData->nWaves);   /*padded zeroes for fake beams*/
   writeComp1dUint16HDF5(group_id,"beam",tempUint16,hdfData->nWaves);
   TIDY(tempUint16);
@@ -594,6 +598,9 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   tempDouble=dalloc(hdfData->nWaves,"bounce_time_offset_lastbin_error",0);
   writeComp1dDoubleHDF5(sgID,"bounce_time_offset_lastbin_error",tempDouble,hdfData->nWaves);
   TIDY(tempDouble);
+  tempUint8=padUint8zeros(hdfData->nWaves);
+  writeComp1dUint8HDF5(sgID,"degrade",tempUint8,hdfData->nWaves);
+  TIDY(tempUint8);
   tempDouble=setDeltaTime(hdfData->nWaves);
   writeComp1dDoubleHDF5(sgID,"delta_time",tempDouble,hdfData->nWaves);
   TIDY(tempDouble);
@@ -778,6 +785,28 @@ double *setRXenergyL1B(gediHDF *hdfData)
 
   return(tempDouble);
 }/*setRXenergyL1B*/
+
+
+/*####################################################*/
+/*set all_samples_sum*/
+
+uint32_t *setAllSamplesSumL1B(gediHDF *hdfData)
+{
+  int i=0,j=0;
+  uint32_t *tempUint32=NULL;
+
+  if(!(tempUint32=(uint32_t *)calloc(hdfData->nWaves,sizeof(uint32_t)))){
+    fprintf(stderr,"error in tempUint32 allocation.\n");
+    exit(1);
+  }
+
+  for(i=0;i<hdfData->nWaves;i++){
+    tempUint32[i]=0;
+    for(j=0;j<hdfData->nBins[0];j++)tempUint32[i]+=hdfData->wave[0][j];
+  }
+
+  return(tempUint32);
+}/*setAllSamplesSumL1B*/
 
 
 /*####################################################*/
