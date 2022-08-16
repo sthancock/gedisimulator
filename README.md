@@ -233,7 +233,7 @@ Program to process large-footprint lidar data (real or simulated) and produce st
     -useInt;          use discrete intensity instead of count
     -useFrac;         use fractional hits rather than counts
     -rhRes r;         percentage energy resolution of RH metrics
-    -laiRes res;      LAI profile resolution in metres
+    -laiRes res;      LAI profile resolution in metres. Default 10 m.
     -laiH h;          height to calculate LAI to
     -noRHgauss;       do not fit Gaussians
     -gTol tol;        ALS ground tolerance. Used to calculate slope.
