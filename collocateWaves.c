@@ -2091,7 +2091,7 @@ control *readCommands(int argc,char **argv)
 -output name;     output filename\n\
 -listAls list;    input file list for multiple als files\n\
 -als file;        input als file\n\
--gedi file;       single input GEDI/LVIS file\n\
+-gedi file;       single input GEDI/LVIS L1B file\n\
 -listGedi file;   list of multiple GEDI/LVIS files\n\
 -readHDFgedi;     read GEDI HDF5 input (default)\n\
 -lgw;             LVIS is in lgw (default is GEDI hdf5)\n\
