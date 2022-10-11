@@ -50,7 +50,7 @@ The other .c files are either small test programs in the development of the abov
 There are three ways to install the code.
 
 * Singularity container: Simplest but needs root access to set up
-* Compile from souce: Do this of you are confident compiling C code
+* Compile from source: Do this of you are confident compiling C code
 * Compilation script: Automatically does the above. Do this if you don't have root access and are not confident compiling C code
 
 These three methods are listed below. Note that the compilation script will create a directory structure to install the code in to and modify your .bashrc file to point to these, so it is not recommended if you have a particular way you like your system set up.
@@ -117,7 +117,7 @@ Make sure that all **.csh** and **.bash** files are also in your path.
 
 ### Compilation script
 
-There is a bash script that will create a directory structure, clone the necessary libraries that do not have package managres and compile the script. *Note* that the package managed libraries are still required and these should be installed first (Gnu Scientific Library, Geotiff, HDF5, GDAL).
+There is a bash script that will create a directory structure, clone the necessary libraries that do not have package managers and compile the script. *Note* that the package managed libraries are still required and these should be installed first (Gnu Scientific Library, Geotiff, HDF5, GDAL).
 
 Download and run the script by typing the following commands in your terminal (Unix or Linux):
 
@@ -209,6 +209,10 @@ Program to create GEDI waveforms from ALS las or pts files. laz not yet supporte
     -polyGround;     find mean ground elevation and slope through fitting a polynomial
     -nnGround;       find mean ground elevation and slope through nearest neighbour
 
+
+### A note on ALS data
+
+The **-ground** flag in gediRat uses the ALS ground classification to separate the contributions to the waveform into ground and canopy. This weighting between ground and canopy is then used in gediMetric to estimate the ALS derived canopy cover. Therefore, the tolerance used when classifying the ground points in the ALS data may affect the canopy cover estimate returned by gediMetric if too tight a tolerance is used. The ground classification tolerance should be enough to account for any topographic variations within a footprint as well as any ALS noise (particularly at the edge of flightlines). For operational use, gediRat is run on ALS data that has been classified with a 60 cm tolerance.
 
 
 
