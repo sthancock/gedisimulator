@@ -2675,7 +2675,7 @@ void writeHelp()
 -useInt;          use discrete intensity instead of count\n\
 -useFrac;         use fractional hits rather than counts\n\
 -rhRes r;         percentage energy resolution of RH metrics\n\
--laiRes res;      lai profile resolution in metres\n\
+-laiRes res;      lai profile resolution in metres. Default 10 m.\n\
 -laiH h;          height to calculate LAI to\n\
 -noRHgauss;       do not fit Gaussians\n\
 -onlySNR;         only calculate the SNR, no metrics\n\
