@@ -50,7 +50,7 @@ The other .c files are either small test programs in the development of the abov
 There are three ways to install the code.
 
 * Singularity container: Simplest but needs root access to set up
-* Compile from souce: Do this of you are confident compiling C code
+* Compile from source: Do this of you are confident compiling C code
 * Compilation script: Automatically does the above. Do this if you don't have root access and are not confident compiling C code
 
 These three methods are listed below. Note that the compilation script will create a directory structure to install the code in to and modify your .bashrc file to point to these, so it is not recommended if you have a particular way you like your system set up.
@@ -117,7 +117,7 @@ Make sure that all **.csh** and **.bash** files are also in your path.
 
 ### Compilation script
 
-There is a bash script that will create a directory structure, clone the necessary libraries that do not have package managres and compile the script. *Note* that the package managed libraries are still required and these should be installed first (Gnu Scientific Library, Geotiff, HDF5, GDAL).
+There is a bash script that will create a directory structure, clone the necessary libraries that do not have package managers and compile the script. *Note* that the package managed libraries are still required and these should be installed first (Gnu Scientific Library, Geotiff, HDF5, GDAL).
 
 Download and run the script by typing the following commands in your terminal (Unix or Linux):
 
@@ -210,6 +210,10 @@ Program to create GEDI waveforms from ALS las or pts files. laz not yet supporte
     -nnGround;       find mean ground elevation and slope through nearest neighbour
 
 
+### A note on ALS data
+
+The **-ground** flag in gediRat uses the ALS ground classification to separate the contributions to the waveform into ground and canopy. This weighting between ground and canopy is then used in gediMetric to estimate the ALS derived canopy cover. Therefore, the tolerance used when classifying the ground points in the ALS data may affect the canopy cover estimate returned by gediMetric if too tight a tolerance is used. The ground classification tolerance should be enough to account for any topographic variations within a footprint as well as any ALS noise (particularly at the edge of flightlines). For operational use, gediRat is run on ALS data that has been classified with a 60 cm tolerance.
+
 
 
 ## gediMetric ##
@@ -233,7 +237,7 @@ Program to process large-footprint lidar data (real or simulated) and produce st
     -useInt;          use discrete intensity instead of count
     -useFrac;         use fractional hits rather than counts
     -rhRes r;         percentage energy resolution of RH metrics
-    -laiRes res;      LAI profile resolution in metres
+    -laiRes res;      LAI profile resolution in metres. Default 10 m.
     -laiH h;          height to calculate LAI to
     -noRHgauss;       do not fit Gaussians
     -gTol tol;        ALS ground tolerance. Used to calculate slope.
@@ -382,7 +386,7 @@ Lefsky, Michael A., Michael Keller, Yong Pang, Plinio B. De Camargo, and Maria O
 
 ## collocateWaves ##
 
-Uses the correlation method in Blair and Hofton (1999) to colocate a large-footprint lidar dataset with a small-footprint, discrete-return dataset. It uses the Pearson correlation to find the best affine transformation (x and y only, or x, y and z) and footprint size needed to align a large-footprint dataset with a small-footprint dataset. It has three potential modes of operation.
+Uses the correlation method in Blair and Hofton (1999) to colocate a large-footprint lidar dataset with a small-footprint, discrete-return dataset. Note that it requires the full-waveform LVIS or GEDI data, which is contained in the L1B files. It uses the Pearson correlation to find the best affine transformation (x and y only, or x, y and z) and footprint size needed to align a large-footprint dataset with a small-footprint dataset. It has three potential modes of operation.
 
 * It can test a grid of affine transformations and give the correlation for every point (for a single footprint width), as used in Blair and Hofton (1999)
 * It can use a simplex to move along the error surface and find the optimum transformation and footprint size. Note that initial location needs to be within around 20 m of the true location for their to be a sufficient gradient on the error surface.
@@ -396,7 +400,7 @@ If the full grid is used, it outputs an ASCII file with the correlation for each
     -output name;     output filename
     -listAls list;    input file list for multiple als files
     -als file;        input als file
-    -gedi file;       single input GEDI/LVIS file
+    -gedi file;       single input GEDI/LVIS L1B file
     -listGedi file;   list of multiple GEDI/LVIS files
     -readHDFgedi;     read GEDI HDF5 input (default)
     -lgw;             LVIS is in lgw (default is GEDI hdf5)
