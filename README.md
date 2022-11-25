@@ -50,7 +50,7 @@ The other .c files are either small test programs in the development of the abov
 There are three ways to install the code.
 
 * Singularity container: Simplest but needs root access to set up
-* Compile from source: Do this of you are confident compiling C code
+* Compile from source: Do this if you are confident compiling C code
 * Compilation script: Automatically does the above. Do this if you don't have root access and are not confident compiling C code
 
 These three methods are listed below. Note that the compilation script will create a directory structure to install the code in to and modify your .bashrc file to point to these, so it is not recommended if you have a particular way you like your system set up.
