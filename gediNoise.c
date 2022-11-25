@@ -110,10 +110,15 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   float reflScale=0;
   float *smooNoise=NULL;
   float *tempNoise=NULL;
-  float meanNoise=0;
+  float meanNoise=0,cov=0;
   float *digitiseWave(float *,int,char,float,float);
   void scaleNoiseDN(float *,int,float,noisePar *);
   void rescaleNoiseStdev(float,float *,int);
+
+
+  /*cover to use here, in case running on real data*/
+  if(data->cov>=0.0)cov=data->cov;
+  else              cov=0.0;
 
   /*array to hold Gaussian noise*/
   tempNoise=falloc((uint64_t)data->nBins,"temp noised",0);
@@ -128,7 +133,7 @@ void applyLinkNoise(dataStruct *data,float *wave,noisePar *gNoise,float res,floa
   /*keep track of mean to remove skew*/
   meanNoise=0.0;
   /*apply noise*/
-  reflScale=(data->cov*rhoc+(1.0-data->cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
+  reflScale=(cov*rhoc+(1.0-cov)*rhog)*tot/(gNoise->linkCov*rhoc+(1.0-gNoise->linkCov)*rhog);  /*variable surface reflectance*/
   sigScale=gNoise->linkSig/gNoise->trueSig;
   /*stdev of sine amplitude is Amp/sqrt(2)*/
   thisSig=sqrt(gNoise->linkSig*gNoise->linkSig-gNoise->periodAmp*gNoise->periodAmp*sigScale*sigScale/2.0);    /*to move the calculation out of the loop*/
@@ -219,7 +224,7 @@ float setNoiseSigma(noisePar *noise,float pSigma,float fSigma,float rhoc,float r
 
   slope=2.0*M_PI/180.0;
 
-  gRefl=(1.0-noise->linkCov)*rhoc;
+  gRefl=(1.0-noise->linkCov)*rhog;
 
   tanSlope=sin(slope)/cos(slope);
   sigEff=sqrt(pSigma*pSigma+fSigma*fSigma*tanSlope*tanSlope);
