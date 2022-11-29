@@ -62,6 +62,9 @@ typedef struct{
   float linkPsig;  /*pulse sigma used for link margin*/
   /*parameters*/
   gediIOstruct gediIO;
+  /*surface properties*/
+  float rhoC;   /*canopy reflectance*/
+  float rhoG;   /*ground reflectance*/
 }control;
 
 
@@ -106,7 +109,6 @@ int main(int argc,char **argv)
 gediHDF *noiseGEDI(control *dimage)
 {
   int i=0,j=0;
-  float rhoC=0,rhoG=0;
   float rhoRatio=0;
   gediHDF *hdfGedi=NULL;
   gediHDF *allHDF=NULL;
@@ -114,10 +116,8 @@ gediHDF *noiseGEDI(control *dimage)
   dataStruct *tidyData(dataStruct *,char);
 
   /*determine noise level*/
-  rhoG=0.4;
-  rhoC=0.57;
-  rhoRatio=rhoC/rhoG;
-  dimage->noise.linkSig=setNoiseSigma(&dimage->noise,dimage->linkPsig,dimage->linkFsig,rhoC,rhoG);
+  rhoRatio=dimage->rhoC/dimage->rhoG;
+  dimage->noise.linkSig=setNoiseSigma(&dimage->noise,dimage->linkPsig,dimage->linkFsig,dimage->rhoC,dimage->rhoG);
 
   /*read dummy hdf data*/
   dimage->gediIO.useInt=dimage->gediIO.useCount=dimage->gediIO.useFrac=0;
@@ -140,7 +140,7 @@ gediHDF *noiseGEDI(control *dimage)
       /*determine true cover to use for link margin*/
       data->cov=waveformTrueCover(data,&dimage->gediIO,rhoRatio);
       /*add noise*/
-      addNoise(data,&dimage->noise,dimage->linkFsig,dimage->linkPsig,data->res,rhoC,rhoG);
+      addNoise(data,&dimage->noise,dimage->linkFsig,dimage->linkPsig,data->res,dimage->rhoC,dimage->rhoG);
       /*copy back*/
       memcpy(&allHDF->wave[j][i*hdfGedi->nBins[0]],data->noised,data->nBins*sizeof(float));
       data=tidyData(data,dimage->readHDFgedi);
@@ -236,6 +236,8 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.aEPSG=4326;      /*default is not to reproject*/
   dimage->linkFsig=5.5;
   dimage->linkPsig=0.9;
+  dimage->rhoG=0.4;
+  dimage->rhoC=0.57;
 
   /*read the command line*/
   for (i=1;i<argc;i++){
@@ -284,8 +286,14 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-aEPSG",6)){
         checkArguments(1,i,argc,"-aEPSG");
         dimage->gediIO.aEPSG=atoi(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-rhoG",5)){
+        checkArguments(1,i,argc,"-rhoG");
+        dimage->rhoG=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-rhoC",5)){
+        checkArguments(1,i,argc,"-rhoC");
+        dimage->rhoC=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-help",5)){
-        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;    output filename\n-l1b;            write output in L1B format\n-aEPSG epsg;     EPSG code of ALS data if writing in L1B format\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;   footprint width to use when calculating and applying signal noise\n-linkPsig sig;   pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-nSkew x;        skewness of noise distribution\n-nPeriodAmp a;   periodic noise amplitude. MUST be smaller than trueSig\n-nPeriodOm p;    periodic noise wavelength\n-bitRate n;      DN bit rate\n\n");
+        fprintf(stdout,"\n#####\nProgram to calculate GEDI waveform metrics\n#####\n\n-input name;     waveform  input filename\n-output name;    output filename\n-l1b;            write output in L1B format\n-aEPSG epsg;     EPSG code of ALS data if writing in L1B format\n-seed n;         random number seed\n-linkNoise linkM cov;     apply Gaussian noise based on link margin at a cover\n-dcBias dn;      mean noise level\n-linkFsig sig;   footprint width to use when calculating and applying signal noise\n-linkPsig sig;   pulse width to use when calculating and applying signal noise\n-trueSig sig;    true sigma of background noise\n-nSkew x;        skewness of noise distribution\n-nPeriodAmp a;   periodic noise amplitude. MUST be smaller than trueSig\n-nPeriodOm p;    periodic noise wavelength\n-bitRate n;      DN bit rate\n-rhoG r;         ground reflectance\n-rhoC r;         canopy reflectance\n\n");
         exit(1);
       }else{
         fprintf(stderr,"%s: unknown argument on command line: %s\nTry gediRat -help\n",argv[0],argv[i]);
