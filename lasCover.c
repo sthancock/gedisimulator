@@ -69,7 +69,7 @@ typedef struct{
 typedef struct{
   char **inList;
   int nFiles;
-  char outNamen[200];
+  char outNamen[1000];
 
   double footRes;     /*footprint grid resolution*/
 

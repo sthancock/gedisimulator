@@ -59,7 +59,7 @@ typedef struct{
   /*input/output*/
   int nFiles;   /*number of waveforms*/
   char **inList;
-  char listNamen[200];
+  char listNamen[1000];
   char outRoot[200];
 
   /*options*/

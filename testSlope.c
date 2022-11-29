@@ -37,7 +37,7 @@
 /*control structure*/
 
 typedef struct{
-  char outNamen[200];   /*output filename*/
+  char outNamen[1000];   /*output filename*/
   char writeWave;       /*write waveform switch*/
   float res;            /*instrument resolution*/
   float A;              /*ground amplitude*/

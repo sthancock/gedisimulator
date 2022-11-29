@@ -47,8 +47,8 @@ typedef struct{
   char **inList;
   int nFiles;
   char outRoot[200];
-  char canNamen[200];  /*canopy filename*/
-  char grNamen[200];   /*ground filename*/
+  char canNamen[1000];  /*canopy filename*/
+  char grNamen[1000];   /*ground filename*/
   float thresh;        /*maximum intensity of area of interest*/
   uint64_t pBuffSize;  /*point buffer rading size in bytes*/
   char writeAll;       /*write all points*/

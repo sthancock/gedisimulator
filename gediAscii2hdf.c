@@ -21,7 +21,7 @@
 typedef struct{
   /*input/output*/
   gediIOstruct gediIO; /*input/output structure*/
-  char outNamen[200];
+  char outNamen[1000];
   int maxGauss;     /*maximum number of Gaussians for output*/
 
   /*switches*/

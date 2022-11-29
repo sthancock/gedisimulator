@@ -11,9 +11,9 @@
 /*control structure*/
 
 typedef struct{
-  char metricNamen[200];   /*metric file input*/
-  char trackNamen[200];    /*GEDI tracks to use*/
-  char outNamen[200];      /*output filename*/
+  char metricNamen[1000];   /*metric file input*/
+  char trackNamen[1000];    /*GEDI tracks to use*/
+  char outNamen[1000];      /*output filename*/
   double minSep;           /*minimum separation to accept*/
   float gridRes;           /*grid resolution*/
 }control;

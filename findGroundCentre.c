@@ -47,7 +47,7 @@
 /*control structure*/
 
 typedef struct{
-  char inNamen[200];  /*waveform filename*/
+  char inNamen[1000];  /*waveform filename*/
   int useCol;         /*column to read the waveform from*/
   denPar den;         /*denoising parameters*/
 }control;

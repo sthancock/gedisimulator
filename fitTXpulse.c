@@ -58,7 +58,7 @@ typedef struct{
   float oRes;      /*output resolution*/
   int minN;
   char txStats;    /*write TX stats switch*/
-  char statsNamen[200];
+  char statsNamen[1000];
   char useBeam[8]; /*use beam or not switch*/
 }control;
 

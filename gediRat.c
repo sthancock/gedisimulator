@@ -58,7 +58,7 @@
 
 typedef struct{
   char **inList;
-  char outNamen[200];
+  char outNamen[1000];
   char waveNamen[400];
 
   /*IO structure*/
