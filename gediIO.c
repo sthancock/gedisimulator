@@ -3276,7 +3276,7 @@ void setGediPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
       /*determine number of bins*/
       gediIO->pulse->nBins=0;
       x=0.0;
-      if(iThresh<=0.0)iThresh=0.0006;  /*prevent infinite tolerances*/
+      if(gediRat->iThresh<=0.0)gediRat->iThresh=0.0006;  /*prevent infinite tolerances*/
       do{
         y=(float)gaussian((double)x,(double)gediIO->pSigma,0.0);
         x+=gediIO->pRes;
