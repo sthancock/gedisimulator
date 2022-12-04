@@ -363,6 +363,7 @@ waveStruct *makeGediWaves(gediRatStruct *,gediIOstruct *,pCloudStruct **);
 waveStruct *tidyWaveStruct(waveStruct *);
 void setGediGrid(gediIOstruct *,gediRatStruct *);
 void setGediPulse(gediIOstruct *,gediRatStruct *);
+void applyPulseShape(gediIOstruct *,gediRatStruct *,waveStruct *);
 void writeGEDIhdf(gediHDF *,char *,gediIOstruct *);
 void writeGEDIl1b(gediHDF *,char *,gediIOstruct *);
 void setGediFootprint(gediRatStruct *,gediIOstruct *);

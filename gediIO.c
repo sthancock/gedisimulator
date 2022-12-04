@@ -4130,8 +4130,6 @@ void waveFromPointCloud(gediRatStruct *gediRat, gediIOstruct *gediIO,pCloudStruc
   double totGround=0;     /*contrbution to ground estimate*/
   float refl=0,rScale=0,fracHit=0,totAng=0;
   void gediFromWaveform(pCloudStruct *,uint32_t,float,waveStruct *,gediRatStruct *,gediIOstruct *);
-  void applyPulseShape(gediIOstruct *,gediRatStruct *,waveStruct *);
-
 
   /*reset mean scan angle*/
   waves->meanScanAng=totAng=0.0;
