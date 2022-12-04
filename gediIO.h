@@ -360,6 +360,7 @@ gediHDF *tidyGediHDF(gediHDF *);
 gediHDF *setUpHDF(gediIOstruct *,gediRatStruct *,char,char *,int *,int);
 pCloudStruct *readALSdata(lasFile *las,gediRatStruct *gediRat,int);
 waveStruct *makeGediWaves(gediRatStruct *,gediIOstruct *,pCloudStruct **);
+waveStruct *tidyWaveStruct(waveStruct *);
 void setGediGrid(gediIOstruct *,gediRatStruct *);
 void setGediPulse(gediIOstruct *,gediRatStruct *);
 void writeGEDIhdf(gediHDF *,char *,gediIOstruct *);

@@ -3841,6 +3841,23 @@ void updateGediCoord(gediRatStruct *gediRat,int i,int j)
 
 
 /*####################################*/
+/*clear wave structure*/
+
+waveStruct *tidyWaveStruct(waveStruct *waves)
+{
+
+  if(waves){
+    TTIDY((void **)waves->wave,waves->nWaves);
+    TTIDY((void **)waves->canopy,waves->nWaves);
+    TTIDY((void **)waves->ground,waves->nWaves);
+    TIDY(waves);
+  }
+
+  return(waves);
+}/*tidyWaveStruct*/
+
+
+/*####################################*/
 /*allocate wave structure*/
 
 waveStruct *allocateGEDIwaves(gediIOstruct *gediIO,gediRatStruct *gediRat,pCloudStruct **data,pointMapStruct *pointmap)
