@@ -148,6 +148,22 @@ Which, if it has worked, will print out the options for the collocateWaves tool.
 Program to create GEDI waveforms from ALS las or pts files. laz not yet supported. Data is output either as ASCII files or as a HDF5 file, both of which can be ready by gediMetric below.
 
 
+
+### Usage example
+
+gediRat reads from ALS data in .las format and outputs waveforms in either ASCII or HDF5 format. To read data from a single las file (``file.las''), simulate a single footprint at coordinates **lon, lat**, and write the results to an ASCII file, use the following command:
+
+    gediRat -input file.las -coord $lon $lat -output waveform.txt
+
+To read data from multiple las files, perform a grid of simulations and write the output to a HDF5 file, use the following command:
+
+    gediRat -inList alsList.txt -output waveforms.h5 -hdf -ground -step 25 -gridBound $minX $maxX $minY $maxY
+
+Where ``alsList.txt'' is an ASCII file containing a list of absolute filenames (including path) of las files. This will make a grid of simulations between minX,minY and maxX,maxY with 25 m steps. The output will be HDF5 format and the ground portion of the waveforms will be labelled.
+
+
+
+
 ##### Input output filenames and format
     -input name;     lasfile input filename
     -inList list;    input file list (ASCII file) for multiple files
