@@ -149,7 +149,7 @@ Program to create GEDI waveforms from ALS las or pts files. laz not yet supporte
 
 
 
-### Usage example
+#### Usage example
 
 gediRat reads from ALS data in .las format and outputs waveforms in either ASCII or HDF5 format. To read data from a single las file (``file.las''), simulate a single footprint at coordinates **lon, lat**, and write the results to an ASCII file, use the following command:
 
@@ -235,6 +235,16 @@ The **-ground** flag in gediRat uses the ALS ground classification to separate t
 ## gediMetric ##
 
 Program to process large-footprint lidar data (real or simulated) and produce standard waveform metrics. It can add noise to simulations and alter pulse shapes (increase length only). It reads either ASCII or HDF5 files created by gediRat, or can read LVIS data in either HDF5 or .lgw format. It will be updated to read GEDI data when that is available. Take care when reading ASCII data as some options are mutually exclusive (different gediRat options can change the column order). This outputs an ASCII file with the first row defining the contents of each column. Output variable names are defined below.
+
+
+#### Usage example
+
+gediMetric reads waveform files in either ASCII, HDF5 (GEDI L1B, LVIS or gediRat output) or lgw (LVIS binary) format. It needs to be told what format the input is in. An example command on a HDF5 GEDI file (either simulated by gediRat or L1B) is:
+
+    gediMetric -input waveforms.h5 -readHDFgedi -ground -varScale 3.5 -sWidth 0.8 -rhRes 2 -laiRes 5
+
+That will use a noise threshold of the mean plus 3.5\*standard deviation, a smoothing width of 0.8 m and then output RH metrics in 2% intervals and the LAI profile (PAVD) in 5 m intervals.
+
 
 ##### Input output
     -input name;      waveform  input filename
