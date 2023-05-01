@@ -3276,6 +3276,7 @@ void setGediPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
       /*determine number of bins*/
       gediIO->pulse->nBins=0;
       x=0.0;
+      if(gediRat->iThresh<=0.0)gediRat->iThresh=0.0006;  /*prevent infinite tolerances*/
       do{
         y=(float)gaussian((double)x,(double)gediIO->pSigma,0.0);
         x+=gediIO->pRes;
@@ -3841,6 +3842,23 @@ void updateGediCoord(gediRatStruct *gediRat,int i,int j)
 
 
 /*####################################*/
+/*clear wave structure*/
+
+waveStruct *tidyWaveStruct(waveStruct *waves)
+{
+
+  if(waves){
+    TTIDY((void **)waves->wave,waves->nWaves);
+    TTIDY((void **)waves->canopy,waves->nWaves);
+    TTIDY((void **)waves->ground,waves->nWaves);
+    TIDY(waves);
+  }
+
+  return(waves);
+}/*tidyWaveStruct*/
+
+
+/*####################################*/
 /*allocate wave structure*/
 
 waveStruct *allocateGEDIwaves(gediIOstruct *gediIO,gediRatStruct *gediRat,pCloudStruct **data,pointMapStruct *pointmap)
@@ -4113,8 +4131,6 @@ void waveFromPointCloud(gediRatStruct *gediRat, gediIOstruct *gediIO,pCloudStruc
   double totGround=0;     /*contrbution to ground estimate*/
   float refl=0,rScale=0,fracHit=0,totAng=0;
   void gediFromWaveform(pCloudStruct *,uint32_t,float,waveStruct *,gediRatStruct *,gediIOstruct *);
-  void applyPulseShape(gediIOstruct *,gediRatStruct *,waveStruct *);
-
 
   /*reset mean scan angle*/
   waves->meanScanAng=totAng=0.0;

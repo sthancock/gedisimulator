@@ -172,12 +172,7 @@ int main(int argc,char **argv)
         /*tidy up*/
         TIDY(dimage->gediRat.nGrid);
         TIDY(dimage->gediRat.lobe);
-        if(waves){
-          TTIDY((void **)waves->wave,waves->nWaves);
-          TTIDY((void **)waves->canopy,waves->nWaves);
-          TTIDY((void **)waves->ground,waves->nWaves);
-          TIDY(waves);
-        }
+        waves=tidyWaveStruct(waves);
       }/*grid y loop*/
     }/*grid x loop*/
 

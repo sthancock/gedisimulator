@@ -630,12 +630,7 @@ void writeFinalWaves(control *dimage,dataStruct **lvis,pCloudStruct **als,double
     }
 
     /*tidy up*/
-    if(waves){
-      TTIDY((void **)waves->wave,waves->nWaves);
-      TTIDY((void **)waves->canopy,dimage->simIO.nTypeWaves);
-      TTIDY((void **)waves->ground,dimage->simIO.nTypeWaves);
-      TIDY(waves);
-    }
+    waves=tidyWaveStruct(waves);
     TIDY(dimage->gediRat.lobe);
     TIDY(dimage->gediRat.nGrid);
   }/*waveform loop*/

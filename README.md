@@ -148,6 +148,22 @@ Which, if it has worked, will print out the options for the collocateWaves tool.
 Program to create GEDI waveforms from ALS las or pts files. laz not yet supported. Data is output either as ASCII files or as a HDF5 file, both of which can be ready by gediMetric below.
 
 
+
+#### Usage example
+
+gediRat reads from ALS data in .las format and outputs waveforms in either ASCII or HDF5 format. To read data from a single las file (``file.las''), simulate a single footprint at coordinates **lon, lat**, and write the results to an ASCII file, use the following command:
+
+    gediRat -input file.las -coord $lon $lat -output waveform.txt
+
+To read data from multiple las files, perform a grid of simulations and write the output to a HDF5 file, use the following command:
+
+    gediRat -inList alsList.txt -output waveforms.h5 -hdf -ground -step 25 -gridBound $minX $maxX $minY $maxY
+
+Where ``alsList.txt'' is an ASCII file containing a list of absolute filenames (including path) of las files. This will make a grid of simulations between minX,minY and maxX,maxY with 25 m steps. The output will be HDF5 format and the ground portion of the waveforms will be labelled.
+
+
+
+
 ##### Input output filenames and format
     -input name;     lasfile input filename
     -inList list;    input file list (ASCII file) for multiple files
@@ -219,6 +235,16 @@ The **-ground** flag in gediRat uses the ALS ground classification to separate t
 ## gediMetric ##
 
 Program to process large-footprint lidar data (real or simulated) and produce standard waveform metrics. It can add noise to simulations and alter pulse shapes (increase length only). It reads either ASCII or HDF5 files created by gediRat, or can read LVIS data in either HDF5 or .lgw format. It will be updated to read GEDI data when that is available. Take care when reading ASCII data as some options are mutually exclusive (different gediRat options can change the column order). This outputs an ASCII file with the first row defining the contents of each column. Output variable names are defined below.
+
+
+#### Usage example
+
+gediMetric reads waveform files in either ASCII, HDF5 (GEDI L1B, LVIS or gediRat output) or lgw (LVIS binary) format. It needs to be told what format the input is in. An example command on a HDF5 GEDI file (either simulated by gediRat or L1B) is:
+
+    gediMetric -input waveforms.h5 -readHDFgedi -ground -varScale 3.5 -sWidth 0.8 -rhRes 2 -laiRes 5
+
+That will use a noise threshold of the mean plus 3.5\*standard deviation, a smoothing width of 0.8 m and then output RH metrics in 2% intervals and the LAI profile (PAVD) in 5 m intervals.
+
 
 ##### Input output
     -input name;      waveform  input filename
@@ -395,6 +421,17 @@ Uses the correlation method in Blair and Hofton (1999) to colocate a large-footp
 It requires the large-footprint system pulse shape (either a Gaussian width or a file containing range and intensity) and the EPSG codes for the two datasets. It reads ALS data in .las format and can read either simulated HDF5 files from gediRat or LVIS in HDF5 or lgw format. A reader for GEDI data will be added once that data is available. 
 
 If the full grid is used, it outputs an ASCII file with the correlation for each x, y and z offset. If it uses a simplex it outputs the single optimum offset.
+
+
+#### Usage example
+
+The following example is currently the most efficient for finding the offset between GEDI and ALS data and outputting simulations of GEDI from the ALS aligned with GEDI.
+
+    collocateWaves -listALS alsList.txt -gedi waveforms.h5 -readHDFgedi -aEPSG 32622 -solveSofG -geoError 30 5 -fixFsig -writeWaves simulated.h5 -minDense 3 -minSense 0.9
+
+
+Where ``alsList.txt'' is a list of ALS filenames with absolute path, wavefroms.h5 is the GEDI L1B or simulated file, ``32622'' is the EPSG code of the ALS data and ``simulated.h5'' is the simulated waveforms output filename. This will only use ALS data with at least 3 beams per square metre and only use GEDI waveforms with at least 90% beam sensitivity.
+
 
 #### Input-output options
     -output name;     output filename
