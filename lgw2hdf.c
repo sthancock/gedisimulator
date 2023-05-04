@@ -51,8 +51,8 @@
 /*control structure*/
 
 typedef struct{
-  char inNamen[200];   /*input filename*/
-  char outNamen[200];  /*output filename*/
+  char inNamen[1000];   /*input filename*/
+  char outNamen[1000];  /*output filename*/
 }control;
 
 

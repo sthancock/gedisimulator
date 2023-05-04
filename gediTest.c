@@ -55,8 +55,8 @@ typedef struct{
 /*control structure*/
 
 typedef struct{
-  char inNamen[200];
-  char outNamen[200];
+  char inNamen[1000];
+  char outNamen[1000];
 
   /*GEDI fotprint parameters*/
   double coord[3];

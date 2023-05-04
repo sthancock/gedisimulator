@@ -57,8 +57,8 @@ typedef struct{
   gediIOstruct simIO;    /*input/output structure*/
   gediIOstruct lvisIO;   /*input/output structure*/
   gediRatStruct gediRat; /*simulator options*/
-  char outNamen[200];    /*correlation output filename*/
-  char waveNamen[200];   /*waveform output filename*/
+  char outNamen[1000];    /*correlation output filename*/
+  char waveNamen[1000];   /*waveform output filename*/
   int nLvis;             /*number of LVIS*/
 
   /*options*/

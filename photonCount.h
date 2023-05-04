@@ -60,7 +60,7 @@ typedef struct{
   float H;             /*search window length, metres*/
   /*IO*/
   FILE *opoo;          /*output file*/
-  char outNamen[200];  /*output filename*/
+  char outNamen[1000];  /*output filename*/
   char writeHDF;       /*writeHDF switch*/
   /*HDF file*/
   photonHDF *hdf;      /*HDF file, if needed*/

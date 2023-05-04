@@ -52,7 +52,7 @@
 
 typedef struct{
   char **inList;      /*list of input filenames*/
-  char outNamen[200]; /*output filename*/
+  char outNamen[1000]; /*output filename*/
   int nFiles;         /*number of input files*/
   double bounds[4];   /*bounds to clip*/
   uint64_t pBuffSize;  /*point buffer rading size in bytes*/

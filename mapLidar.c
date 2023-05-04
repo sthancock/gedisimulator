@@ -49,8 +49,8 @@ typedef struct{
   /*input output*/
   char **inList;
   int nFiles;
-  char outNamen[200];
-  char bNamen[200];
+  char outNamen[1000];
+  char bNamen[1000];
   FILE *bFile;        /*bounds file output*/
 
   /*switches*/
