@@ -2719,7 +2719,7 @@ void writeHelp()
 -nPhotG n;        mean number of ground photons (replaces nPhotons and rhoVrhoG)\n\
 -photHDF;         write photon-counting output in HDF5\n");
   #endif
-  fprintf(stdout,"\nUnfinished\n\
+  fprintf(stdout,"\nPulse-compressed lidar\n\
 -photonPCL;       convert to photon counting pulse-compressed before processing\n\
 -pcl;             pulse-compressed processing\n\
 -preSmooPCL sig;  pre-smooth before PCL with a Gaussian\n\
