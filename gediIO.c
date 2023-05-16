@@ -2971,6 +2971,9 @@ void setGediGrid(gediIOstruct *gediIO,gediRatStruct *gediRat)
     gediRat->globMaxX=gediRat->coord[0]+gediRat->maxSep;
     gediRat->globMinY=gediRat->coord[1]-gediRat->maxSep;
     gediRat->globMaxY=gediRat->coord[1]+gediRat->maxSep;
+    gediRat->waveIDlist=chChalloc(1,"wave ID list",0);
+    gediRat->waveIDlist[0]=challoc(300,"wave ID list",1);
+    sprintf(gediRat->waveIDlist[0],"BEAM.x.%.2f.y.%.2f",gediRat->coord[0],gediRat->coord[1]);
   }
 
   if((gediIO->nMessages>1)&&(gediRat->gNx*gediRat->gNy)>gediIO->nMessages)gediIO->nMessages=(int)(gediRat->gNx*gediRat->gNy/gediIO->nMessages);
