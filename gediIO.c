@@ -3665,6 +3665,7 @@ void packGEDIhdf(waveStruct *waves,gediHDF *hdfData,int waveNumb,gediIOstruct *g
       for(i=0;i<waves->nBins;i++)tot[j]+=waves->wave[j][i];
     }
 
+
     /*set threshold*/
     thresh=falloc((uint64_t)hdfData->nTypeWaves,"thresh",0);
     for(j=0;j<hdfData->nTypeWaves;j++)thresh[j]=0.01*tot[j];
