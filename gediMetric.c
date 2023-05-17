@@ -1636,7 +1636,7 @@ float *findLAIprofile(float *canopy,float totG,int nBins,float laiRes,int *laiBi
   float G=0;           /*Ross-G function*/
 
   /*leaf angle distribution*/
-  G=0.6;   /*spherical distribution*/
+  G=0.5;   /*random distribution*/
 
   /*total energies*/
   totC=0.0;
