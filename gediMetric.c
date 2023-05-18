@@ -67,7 +67,7 @@ float rhoC;
 /*###########################################################*/
 /*function definition used here only*/
 
-float *findLAIprofile(float *,float,int,float,int *,double,float,double *,float);
+float *findLAIprofile(float *,float,int,float,int *,double,float,double *,float,float);
 char checkUsable(float *,int);
 
 
@@ -1359,9 +1359,9 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   void findSignalBounds(float *,double *,int,double *,double *,control *);
   void findWaveExtents(float *,double *,int,double,double,float *,float *);
   void setDenoiseDefault(denPar *);
-  float *trueLAIprofile(float *,float *,double *,int,float,float,double,float,int *);
+  float *trueLAIprofile(float *,float *,double *,int,float,float,double,float,int *,float);
   float *gaussLAIprofile(float *,double *,int,float,float,double,float,int *,float,float,float,float);
-  float *halfEnergyLAIprofile(float *,double *,int,float,float,double,float,int *);
+  float *halfEnergyLAIprofile(float *,double *,int,float,float,double,float,int *,float);
   denPar den;
 
 
@@ -1463,16 +1463,16 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
 
   /*lai profiles*/
   if(dimage->noCanopy==0){
-    if(data->ground)metric->tLAI=trueLAIprofile(data->wave[data->useType],data->ground[data->useType],z,nBins,dimage->laiRes,dimage->rhoRatio,data->gElev,dimage->maxLAIh,&metric->laiBins);
-    else metric->tLAI=trueLAIprofile(data->wave[data->useType],NULL,z,nBins,dimage->laiRes,dimage->rhoRatio,data->gElev,dimage->maxLAIh,&metric->laiBins);
+    if(data->ground)metric->tLAI=trueLAIprofile(data->wave[data->useType],data->ground[data->useType],z,nBins,dimage->laiRes,dimage->rhoRatio,data->gElev,dimage->maxLAIh,&metric->laiBins,dimage->gediIO.res);
+    else metric->tLAI=trueLAIprofile(data->wave[data->useType],NULL,z,nBins,dimage->laiRes,dimage->rhoRatio,data->gElev,dimage->maxLAIh,&metric->laiBins,dimage->gediIO.res);
     if(sig){
       metric->gLAI=gaussLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->gHeight,dimage->maxLAIh,&metric->laiBins,mu[gInd],A[gInd],sig[gInd],dimage->gediIO.res);
     }else{
-      metric->gLAI=trueLAIprofile(data->wave[data->useType],NULL,z,nBins,dimage->laiRes,dimage->rhoRatio,data->gElev,dimage->maxLAIh,&metric->laiBins);
+      metric->gLAI=trueLAIprofile(data->wave[data->useType],NULL,z,nBins,dimage->laiRes,dimage->rhoRatio,data->gElev,dimage->maxLAIh,&metric->laiBins,dimage->gediIO.res);
     }
-    metric->hgLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->gHeight,dimage->maxLAIh,&metric->laiBins);
-    metric->hiLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->inflGround,dimage->maxLAIh,&metric->laiBins);
-    metric->hmLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->maxGround,dimage->maxLAIh,&metric->laiBins);
+    metric->hgLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->gHeight,dimage->maxLAIh,&metric->laiBins,dimage->gediIO.res);
+    metric->hiLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->inflGround,dimage->maxLAIh,&metric->laiBins,dimage->gediIO.res);
+    metric->hmLAI=halfEnergyLAIprofile(denoised,z,nBins,dimage->laiRes,dimage->rhoRatio,metric->maxGround,dimage->maxLAIh,&metric->laiBins,dimage->gediIO.res);
   }
 
   /*signal start and end*/
@@ -1516,7 +1516,7 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
 /*####################################################*/
 /*LAI profile using reflected half energy*/
 
-float *halfEnergyLAIprofile(float *denoised,double *z,int nBins,float laiRes,float rhoRatio,double gElev,float maxLAIh,int *laiBins)
+float *halfEnergyLAIprofile(float *denoised,double *z,int nBins,float laiRes,float rhoRatio,double gElev,float maxLAIh,int *laiBins,float res)
 {
   int i=0,gBin=0,mBin=0;
   float *LAI=NULL;
@@ -1551,7 +1551,7 @@ float *halfEnergyLAIprofile(float *denoised,double *z,int nBins,float laiRes,flo
   }
 
   /*lai profile*/
-  LAI=findLAIprofile(canopy,totG,nBins,laiRes,laiBins,gElev,rhoRatio,z,maxLAIh);
+  LAI=findLAIprofile(canopy,totG,nBins,laiRes,laiBins,gElev,rhoRatio,z,maxLAIh,res);
 
   /*tidy up*/
   TIDY(canopy);
@@ -1581,7 +1581,7 @@ float *gaussLAIprofile(float *denoised,double *z,int nBins,float laiRes,float rh
   totG=A*sig*sqrt(2.0*M_PI)/res;
 
   /*lai profile*/
-  LAI=findLAIprofile(canopy,totG,nBins,laiRes,laiBins,gHeight,rhoRatio,z,maxLAIh);
+  LAI=findLAIprofile(canopy,totG,nBins,laiRes,laiBins,gHeight,rhoRatio,z,maxLAIh,res);
 
   /*tidy up*/
   TIDY(canopy);
@@ -1592,7 +1592,7 @@ float *gaussLAIprofile(float *denoised,double *z,int nBins,float laiRes,float rh
 /*####################################################*/
 /*true LAI profile*/
 
-float *trueLAIprofile(float *wave,float *ground,double *z,int nBins,float laiRes,float rhoRatio,double gElev,float maxLAIh,int *laiBins)
+float *trueLAIprofile(float *wave,float *ground,double *z,int nBins,float laiRes,float rhoRatio,double gElev,float maxLAIh,int *laiBins,float res)
 {
   int i=0;
   float *tLAI=NULL;
@@ -1609,7 +1609,7 @@ float *trueLAIprofile(float *wave,float *ground,double *z,int nBins,float laiRes
     }
 
     /*lai profile*/
-    tLAI=findLAIprofile(canopy,totG,nBins,laiRes,laiBins,gElev,rhoRatio,z,maxLAIh);
+    tLAI=findLAIprofile(canopy,totG,nBins,laiRes,laiBins,gElev,rhoRatio,z,maxLAIh,res);
   }else{  /*no ground, leave blank*/
     *laiBins=(int)(maxLAIh/laiRes+0.5)+1;
     tLAI=falloc((uint64_t)(*laiBins),"True LAI profile",0);
@@ -1625,7 +1625,7 @@ float *trueLAIprofile(float *wave,float *ground,double *z,int nBins,float laiRes
 /*####################################################*/
 /*LAI profile from canopy waveform*/
 
-float *findLAIprofile(float *canopy,float totG,int nBins,float laiRes,int *laiBins,double gElev,float rhoRatio,double *z,float maxLAIh)
+float *findLAIprofile(float *canopy,float totG,int nBins,float laiRes,int *laiBins,double gElev,float rhoRatio,double *z,float maxLAIh,float res)
 {
   int i=0,bin=0;
   float *tLAI=NULL;
@@ -1669,7 +1669,7 @@ float *findLAIprofile(float *canopy,float totG,int nBins,float laiRes,int *laiBi
     bin=(int)((float)(z[i]-gElev)/laiRes);
     if(bin>=*laiBins)bin=(*laiBins)-1;
     else if(bin<0)bin=0;
-    tLAI[bin]+=laiProf[i];
+    tLAI[bin]+=laiProf[i]*res/laiRes;
   }
 
   /*tidy up*/
