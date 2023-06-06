@@ -1213,15 +1213,15 @@ void writeResults(dataStruct *data,control *dimage,metStruct *metric,int numb,fl
     if(dimage->noCanopy==0){
       fprintf(dimage->opooMet,", %d FHDhist, %d FHDcan, %d FHDcanHist",14+4*metric->nRH+1+dimage->bayesGround+offset,14+4*metric->nRH+1+dimage->bayesGround+offset+1,14+4*metric->nRH+1+dimage->bayesGround+offset+3);
       offset+=3;
-      fprintf(dimage->opooMet,", %d FHDcanGauss, %d FHDcanGhist,",14+4*metric->nRH+1+dimage->bayesGround+offset,14+4*metric->nRH+1+dimage->bayesGround+offset);
+      fprintf(dimage->opooMet,", %d FHDcanGauss, %d FHDcanGhist,",14+4*metric->nRH+1+dimage->bayesGround+offset,14+4*metric->nRH+1+dimage->bayesGround+offset+1);
       offset+=2;
-      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d tLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+3,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
-      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d gLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+3+metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
-      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d hgLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+3+2*metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
-      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d hiLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+3+3*metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
-      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d hmLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+3+4*metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
+      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d tLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
+      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d gLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
+      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d hgLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+2*metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
+      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d hiLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+3*metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
+      for(i=0;i<metric->laiBins;i++)fprintf(dimage->opooMet," %d hmLAI%gt%g,",14+4*metric->nRH+1+dimage->bayesGround+offset+i+4*metric->laiBins,(float)i*dimage->laiRes,(float)(i+1)*dimage->laiRes);
     }
-    fprintf(dimage->opooMet," %d gSlope,",14+4*metric->nRH+1+dimage->bayesGround+offset+3+5*metric->laiBins);
+    fprintf(dimage->opooMet," %d gSlope,",14+4*metric->nRH+1+dimage->bayesGround+offset+5*metric->laiBins);
     //for(i=0;i<metric->nLm;i++)fprintf(dimage->opooMet,", %d LmomGauss%d",14+4*metric->nRH+1+dimage->bayesGround+21+i,i+1);
     //for(i=0;i<metric->nLm;i++)fprintf(dimage->opooMet,", %d LmomInfl%d",14+4*metric->nRH+1+dimage->bayesGround+21+metric->nLm+i,i+1);
     //for(i=0;i<metric->nLm;i++)fprintf(dimage->opooMet,", %d LmomMax%d",14+4*metric->nRH+1+dimage->bayesGround+21+2*metric->nLm+i,i+1);
