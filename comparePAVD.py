@@ -9,6 +9,8 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 import argparse
+from sys import exit
+
 
 ########################################################
 
@@ -31,20 +33,25 @@ class l2bMetrics():
 
   ######################
 
-  def __init__(self,filename,sim=True):
+  def __init__(self,filename,mode=0):
     '''Class initialiser'''
 
-    if(sim):
+    if(mode==1):
       self.readSim(filename)
-    else:
+    elif(mode==0):
       self.readReal(filename)
+    elif(mode==2):
+      self.readSim(filename,gCol=1,root=" tLAI")
+    else:
+      print("Mode",mode,"not recognised")
+      exit(1)
 
     return
 
 
   ######################
 
-  def readSim(self,filename):
+  def readSim(self,filename,gCol=5,root=" gLAI"):
     '''Read simulated metrics'''
 
     f=open(filename, 'r')
@@ -57,13 +64,12 @@ class l2bMetrics():
 
     # find columns needed
     idCol=0
-    gCol=5
 
     colList=[]
     i=0
     self.nLAI=0
     for bit in bits:
-      if( " gLAI" in bit ):
+      if( root in bit ):
         colList.append(i)
         self.nLAI+=1
       i+=1
@@ -135,6 +141,7 @@ def comparePAVD(sim,real,l2b,outRoot):
 
   nDP=3
   res=5
+  tol=0.0000001
 
   # loop over one of the files
   for i in range(0,sim.nWaves):
@@ -147,19 +154,28 @@ def comparePAVD(sim,real,l2b,outRoot):
 
     outname=outRoot+"."+str(beam)+"."+str(shotN)+".png"
 
+
     l2bPAVD=l2b.pavd[(l2b.beamID==beam)&(l2b.waveID==shotN)][0]
     simPAVD=sim.pavd[i]
+
+    # total leaf area
+    simA=np.sum(simPAVD)*res
+    l2A=np.sum(l2bPAVD)*res
+    simH=simPAVD[simPAVD>tol].argmax()*res
+    l2H=l2bPAVD[l2bPAVD>tol].argmax()*res
+    print("Areas",round(simA,3),round(l2A,3),round(simA/l2A,3),round(l2A/simA,3),"height",simH,l2H)
+
     realPAVD=real.pavd[real.waveID==realID][0]
     plt.plot(l2bPAVD,np.arange(0,l2bPAVD.shape[0]*res,res),label='l2b')
     plt.plot(simPAVD,np.arange(0,simPAVD.shape[0]*res,res),label='sim')
-    plt.plot(realPAVD,np.arange(0,realPAVD.shape[0]*res,res),label='real')
+    #plt.plot(realPAVD,np.arange(0,realPAVD.shape[0]*res,res),label='real')
     plt.legend()
     plt.xlabel("PAVD (m^2/m^3)")
     plt.ylabel("Height (m)")
     plt.savefig(outname)
     plt.cla()
     plt.clf()
-    print("Drawn to",outname)
+    #print("Drawn to",outname)
 
     #for j in range(0,sim.nLAI):
     #  print(i,j,'l2b',round(l2bPAVD[j],nDP),'sim',round(simPAVD[j],nDP),'real',round(realPAVD[j],nDP))
@@ -173,9 +189,9 @@ if __name__ == '__main__':
   cmd=readCommands()
 
   # read each dataset
-  sim=l2bMetrics(cmd.simName)
-  real=l2bMetrics(cmd.realName)
-  l2b=l2bMetrics(cmd.l2bName,sim=False)
+  sim=l2bMetrics(cmd.simName,mode=2)
+  real=l2bMetrics(cmd.realName,mode=1)
+  l2b=l2bMetrics(cmd.l2bName,mode=0)
 
   # Align datasets by shot ID
   comparePAVD(sim,real,l2b,cmd.outRoot)
