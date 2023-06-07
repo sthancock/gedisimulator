@@ -1631,9 +1631,10 @@ float *findLAIprofile(float *canopy,float totG,int nBins,float laiRes,int *laiBi
   float *tLAI=NULL;
   float gap=0,cumul=0;
   float *lngap=NULL;
-  float *laiProf=NULL;
+  //float *laiProf=NULL;
   float totC=0;
   float G=0;           /*Ross-G function*/
+  float *binWave=NULL;
 
   /*leaf angle distribution*/
   G=0.5;   /*random distribution*/
@@ -1642,38 +1643,64 @@ float *findLAIprofile(float *canopy,float totG,int nBins,float laiRes,int *laiBi
   totC=0.0;
   for(i=0;i<nBins;i++)totC+=canopy[i];
 
-  /*make gap profile*/
-  lngap=falloc((uint64_t)nBins,"apparent foliage profile",0);
+  /*if binning up after, make gap profile*/
+  /*lngap=falloc((uint64_t)nBins,"apparent foliage profile",0);
   cumul=0.0;
   for(i=0;i<nBins;i++){
     cumul+=canopy[i];
     gap=1.0-(cumul/(totC+rhoRatio*totG));
     lngap[i]=log(gap);
-  }
+  }*/
 
-  /*lai profile*/
-  laiProf=falloc((uint64_t)nBins,"apparent foliage profile",0);
+  /*if binning up after,lai profile*/
+  /*laiProf=falloc((uint64_t)nBins,"apparent foliage profile",0);
   for(i=0;i<nBins;i++){
     if(i<(nBins-1))laiProf[i]=(-1.0*(lngap[i+1]-lngap[i]))/G;
     else           laiProf[i]=0.0;
   }
-  TIDY(lngap);
+  TIDY(lngap);*/
 
   /*allocate and set blank*/
   *laiBins=(int)(maxLAIh/laiRes+0.5)+1;
   tLAI=falloc((uint64_t)(*laiBins),"True LAI profile",0);
   for(i=0;i<(*laiBins);i++)tLAI[i]=0.0;
 
-  /*bin up*/
+  /*bin up waveform*/
+  binWave=falloc(*laiBins,"",0);
+  for(i=0;i<(*laiBins);i++)binWave[i]=0.0;
   for(i=0;i<nBins;i++){
     bin=(int)((float)(z[i]-gElev)/laiRes);
     if(bin>=*laiBins)bin=(*laiBins)-1;
     else if(bin<0)bin=0;
+    binWave[bin]+=canopy[i];
+  }
+
+  /*calculate gap profile*/
+  lngap=falloc((uint64_t)*laiBins,"apparent foliage profile",0);
+  cumul=0.0;
+  for(i=0;i<*laiBins;i++){
+    cumul+=binWave[i];
+    gap=1.0-(cumul/(totC+rhoRatio*totG));
+    lngap[i]=log(gap);
+  }
+
+  /*if binning up after, bin up now*/
+  /*for(i=0;i<nBins;i++){
+    bin=(int)((float)(z[i]-gElev)/laiRes);
+    if(bin>=*laiBins)bin=(*laiBins)-1;
+    else if(bin<0)bin=0;
     tLAI[bin]+=laiProf[i]*res/laiRes;
+  }*/
+
+  /*calculate LAI profile*/
+  for(i=0;i<*laiBins;i++){
+    if(i<(*laiBins-1))tLAI[i]=((-1.0*(lngap[i+1]-lngap[i]))/G)/laiRes;
+    else              tLAI[i]=0.0;
   }
 
   /*tidy up*/
-  TIDY(laiProf);
+  //TIDY(laiProf);
+
   return(tLAI);
 }/*findLAIprofile*/
 
