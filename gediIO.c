@@ -2365,28 +2365,46 @@ void findPCLends(int *sBin,int *eBin,float *wave,int nBins)
 
 float *setPulseRange(gediIOstruct *gediIO)
 {
-  int i=0;
-  float *x=NULL;
-  float max=0;
+  int i=0,nMax=0;
+  float *x=NULL,CofG=0;
+  float max=0,tot=0;
+  float minSep=0,sepSq=0;
 
   /*allocate space*/
   x=falloc(gediIO->pulse->nBins,"pulse range",0);
 
   /*assign values and check for max*/
   max=-10000.0;
+  CofG=tot=0.0;
   for(i=0;i<gediIO->pulse->nBins;i++){
     x[i]=(float)i*gediIO->pRes;
+    CofG+=x[i]*gediIO->pulse->y[i];
+    tot+=gediIO->pulse->y[i];
 
     if((gediIO->pcl==0)&&(gediIO->pclPhoton==0)){
-      if(gediIO->pulse->y[i]>max){
+      if(gediIO->pulse->y[i]>=max){
         max=gediIO->pulse->y[i];
         gediIO->pulse->centBin=i;
+        if(i>0){
+          if(gediIO->pulse->y[i-1]>=gediIO->pulse->y[i])nMax++;
+        }
       }
     }
   }
 
   /*to allow for chirps*/
   if(gediIO->pcl||gediIO->pclPhoton)gediIO->pulse->centBin=(int)(gediIO->pulse->nBins/2);
+  else{ /*does this not have a defined peak?*/
+    if(nMax>2){
+      CofG/=tot;
+      minSep=100000000.0;
+      for(i=0;i<gediIO->pulse->nBins;i++){
+        sepSq=(x[i]-CofG)*(x[i]-CofG);
+        if(sepSq<minSep)gediIO->pulse->centBin=i;
+      }
+    }
+  }
+
 
   return(x);
 }/*setPulseRange*/
@@ -3392,7 +3410,7 @@ void setPeakChirp(pulseStruct *pulse)
 
 void readSimPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
 {
-  int i=0;
+  int i=0,nMax=0;
   float CofG=0,tot=0,centre=0;
   float minSep=0,max=0;
   char line[400];
@@ -3435,16 +3453,21 @@ void readSimPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
   tot=0.0;
   CofG=0.0;
   max=-1000.0;
+  nMax=0;
   for(i=0;i<gediIO->pulse->nBins;i++){
     CofG+=gediIO->pulse->x[i]*gediIO->pulse->y[i];
     if(gediIO->pulse->y[i]>=max){
       max=gediIO->pulse->y[i];
       centre=gediIO->pulse->x[i];
+      if(i>0){
+        if(gediIO->pulse->y[i-1]>=gediIO->pulse->y[i])nMax++;
+      }
     }
     tot+=gediIO->pulse->y[i];
   }
 
   if(tot>0.0)CofG/=tot;
+  if(nMax>2)centre=CofG;
   CofG-=centre;
 
   if((gediIO->pcl==1)||(gediIO->pclPhoton))centre=gediIO->pulse->x[(int)(gediIO->pulse->nBins/2)];
