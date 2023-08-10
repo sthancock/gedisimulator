@@ -350,7 +350,7 @@ class gediData(object):
       self.z=np.linspace(self.Z0[i],self.ZN[i],num=self.nBins)
 
       # open output file
-      outName='outRoot.'+self.waveID[i]+'.csv'
+      outName=outRoot+'.'+self.waveID[i]+'.csv'
       f=open(outName,'w')
       line='z,wave,ground,cumulWave\n'
       f.write(line)

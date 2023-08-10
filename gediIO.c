@@ -3450,8 +3450,7 @@ void readSimPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
   gediIO->pulse->pRes=gediIO->pRes;
 
   /*determine maximum to centre and total to normalise*/
-  tot=0.0;
-  CofG=0.0;
+  tot=CofG=0.0;
   max=-1000.0;
   nMax=0;
   for(i=0;i<gediIO->pulse->nBins;i++){
