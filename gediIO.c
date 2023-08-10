@@ -2182,10 +2182,12 @@ gediHDF *tidyGediHDF(gediHDF *hdfData)
 
 dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int numb)
 {
-  int i=0;
+  int i=0,nMax=0;
   int sBin=0,eBin=0;
   float zTop=0,maxP=0;
   float *setPulseRange(gediIOstruct *);
+  float CofG=0,tot=0;
+  float sepSq=0,minSep=0;
   double sOff=0,eOff=0;
   dataStruct *data=NULL;
   void findPCLends(int *,int *,float *,int);
@@ -2287,11 +2289,32 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
     memcpy(gediIO->den->pulse[1],gediIO->pulse->y,sizeof(float)*gediIO->den->pBins);
     gediIO->den->matchPulse=falloc(gediIO->den->pBins,"matchPulse",0);
     memcpy(gediIO->den->matchPulse,gediIO->pulse->y,sizeof(float)*gediIO->den->pBins);
+
     maxP=-10000.0;
+    tot=CofG=0.0;
+    nMax=0;
     for(i=0;i<gediIO->den->pBins;i++){
-      if(gediIO->den->pulse[1][i]>maxP){
+      CofG+=gediIO->den->pulse[1][i]*gediIO->den->pulse[0][i];
+      tot+=gediIO->den->pulse[1][i];
+      if(gediIO->den->pulse[1][i]>=maxP){
         maxP=gediIO->den->pulse[1][i];
         gediIO->den->maxPbin=i;
+        if(i>0){
+          if(gediIO->den->pulse[1][i-1]>=gediIO->den->pulse[1][i])nMax++;
+        }
+      }
+    }
+
+    /*use CofG if needed*/
+    CofG/=tot;
+    if(nMax>2){
+      minSep=1000000.0;
+      for(i=0;i<gediIO->den->pBins;i++){
+        sepSq=(gediIO->den->pulse[0][i]-CofG)*(gediIO->den->pulse[0][i]-CofG);
+        if(sepSq<minSep){
+          gediIO->den->maxPbin=i;
+          minSep=sepSq;
+        }
       }
     }
   }else if(hdfGedi[0]->nPbins==0){
@@ -2400,7 +2423,10 @@ float *setPulseRange(gediIOstruct *gediIO)
       minSep=100000000.0;
       for(i=0;i<gediIO->pulse->nBins;i++){
         sepSq=(x[i]-CofG)*(x[i]-CofG);
-        if(sepSq<minSep)gediIO->pulse->centBin=i;
+        if(sepSq<minSep){
+          gediIO->pulse->centBin=i;
+          minSep=sepSq;
+        }
       }
     }
   }
