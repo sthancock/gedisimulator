@@ -57,7 +57,7 @@ class gediData(object):
       # determine whether L2A or L1B
       if('latitude_bin0' in list(f[b]['geolocation'])):  # L1B file
         self.subsetL1B(f,outFile,b,minX,maxX,minY,maxY)
-      elif ('lat_lowestmode' in list(f[b]['geolocation'])):  # L2A file
+      elif ('lat_lowestmode' in list(f[b])):  # L2A file
         self.subsetL2A(f,outFile,b,minX,maxX,minY,maxY)
 
     f.close()
@@ -71,11 +71,12 @@ class gediData(object):
   def subsetL2A(self,f,outFile,b,minX,maxX,minY,maxY):
     '''Subset an L2A beam'''
 
-    print("Not ready yet")
+
+    print("Need to add hr and others")
 
     # read the coords and determine output
-    allLat=np.array(f[b]['geolocation']['lat_lowestmode'])
-    allLon=np.array(f[b]['geolocation']['lon_lowestmode'])
+    allLat=np.array(f[b]['lat_lowestmode'])
+    allLon=np.array(f[b]['lon_lowestmode'])
     useInd=np.where((allLat>=minY)&(allLat<=maxY)&(allLon>=minX)&(allLon<=maxX))
     
     if(len(useInd[0])>0):
@@ -86,6 +87,25 @@ class gediData(object):
     # create the beam group
     outFile.create_group(b)
 
+
+
+    # loop over all arrays per shot
+    for d in self.shotArrListL2A:
+      # read array
+      jimlad=np.array(f[b][d])[useInd]
+      # write subset to a new file
+      outFile[b].create_dataset(d,data=jimlad,compression='gzip')
+
+    # geolocation data
+    g='geolocation'
+    outFile[b].create_group(g)
+    for d in self.geoArrListL2A:
+      if(d!='surface_type'):
+        jimlad=np.array(f[b][g][d])[useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+      else:
+        jimlad=np.array(f[b][g][d])[:,useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
 
     # ancillary data   
     g='ancillary'      
@@ -216,10 +236,39 @@ class gediData(object):
 
 
     # L2A files
+# 'land_cover_data', 
+# 'rh',
+# 'rx_1gaussfit', 'rx_assess', 'rx_processing_a1', 'rx_processing_a2', 'rx_processing_a3', 'rx_processing_a4', 'rx_processing_a5', 'rx_processing_a6', 
+
+    self.shotArrListL2A=['beam','channel','degrade_flag','delta_time','digital_elevation_model','digital_elevation_model_srtm',\
+                       'elev_highestreturn','elev_lowestmode','elevation_bias_flag','elevation_bin0_error','energy_total',\
+                       'lat_highestreturn', 'lat_lowestmode', 'latitude_bin0_error', 'lon_highestreturn', 'lon_lowestmode',\
+                       'longitude_bin0_error','master_frac','master_int','mean_sea_surface','num_detectedmodes','quality_flag',\
+                       'selected_algorithm','selected_mode','selected_mode_flag','sensitivity','shot_number','solar_azimuth',\
+                       'solar_elevation','surface_flag']
+
+    self.geoArrListL2A=['elev_highestreturn_a1', 'elev_highestreturn_a2', 'elev_highestreturn_a3', 'elev_highestreturn_a4', \
+                       'elev_highestreturn_a5', 'elev_highestreturn_a6', 'elev_lowestmode_a1', 'elev_lowestmode_a2', 'elev_lowestmode_a3',\
+                       'elev_lowestmode_a4', 'elev_lowestmode_a5', 'elev_lowestmode_a6', 'elev_lowestreturn_a1', 'elev_lowestreturn_a2',\
+                       'elev_lowestreturn_a3', 'elev_lowestreturn_a4', 'elev_lowestreturn_a5', 'elev_lowestreturn_a6', 'elevation_1gfit',\
+                       'elevs_allmodes_a1', 'elevs_allmodes_a2', 'elevs_allmodes_a3', 'elevs_allmodes_a4', 'elevs_allmodes_a5', \
+                       'elevs_allmodes_a6', 'energy_lowestmode_a1', 'energy_lowestmode_a2', 'energy_lowestmode_a3', 'energy_lowestmode_a4',\
+                       'energy_lowestmode_a5', 'energy_lowestmode_a6', 'lat_highestreturn_a1', 'lat_highestreturn_a2', 'lat_highestreturn_a3', \
+                       'lat_highestreturn_a4', 'lat_highestreturn_a5', 'lat_highestreturn_a6', 'lat_lowestmode_a1', 'lat_lowestmode_a2',\
+                       'lat_lowestmode_a3', 'lat_lowestmode_a4', 'lat_lowestmode_a5', 'lat_lowestmode_a6', 'lat_lowestreturn_a1', \
+                       'lat_lowestreturn_a2', 'lat_lowestreturn_a3', 'lat_lowestreturn_a4', 'lat_lowestreturn_a5', 'lat_lowestreturn_a6',\
+                       'latitude_1gfit', 'lats_allmodes_a1', 'lats_allmodes_a2', 'lats_allmodes_a3', 'lats_allmodes_a4', 'lats_allmodes_a5',\
+                       'lats_allmodes_a6', 'lon_highestreturn_a1', 'lon_highestreturn_a2', 'lon_highestreturn_a3', 'lon_highestreturn_a4',\
+                       'lon_highestreturn_a5', 'lon_highestreturn_a6', 'lon_lowestmode_a1', 'lon_lowestmode_a2', 'lon_lowestmode_a3', \
+                       'lon_lowestmode_a4', 'lon_lowestmode_a5', 'lon_lowestmode_a6', 'lon_lowestreturn_a1', 'lon_lowestreturn_a2', \
+                       'lon_lowestreturn_a3', 'lon_lowestreturn_a4', 'lon_lowestreturn_a5', 'lon_lowestreturn_a6', 'longitude_1gfit',\
+                       'lons_allmodes_a1', 'lons_allmodes_a2', 'lons_allmodes_a3', 'lons_allmodes_a4', 'lons_allmodes_a5', 'lons_allmodes_a6',\
+                       'num_detectedmodes_a1', 'num_detectedmodes_a2', 'num_detectedmodes_a3', 'num_detectedmodes_a4', 'num_detectedmodes_a5',\
+                       'num_detectedmodes_a6', 'quality_flag_a1', 'quality_flag_a2', 'quality_flag_a3', 'quality_flag_a4', 'quality_flag_a5',\
+                       'quality_flag_a6', 'rh_a1', 'rh_a2', 'rh_a3', 'rh_a4', 'rh_a5', 'rh_a6', 'sensitivity_a1', 'sensitivity_a2', \
+                       'sensitivity_a3', 'sensitivity_a4', 'sensitivity_a5', 'sensitivity_a6', 'shot_number', 'stale_return_flag']
 
     self.ancArrListL2A=['l2a_alg_count']
-
-
 
     return
 
