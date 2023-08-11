@@ -73,6 +73,27 @@ class gediData(object):
 
     print("Not ready yet")
 
+    # read the coords and determine output
+    allLat=np.array(f[b]['geolocation']['lat_lowestmode'])
+    allLon=np.array(f[b]['geolocation']['lon_lowestmode'])
+    useInd=np.where((allLat>=minY)&(allLat<=maxY)&(allLon>=minX)&(allLon<=maxX))
+    
+    if(len(useInd[0])>0):
+      useInd=useInd[0]
+    else:      # none in here
+      return
+
+    # create the beam group
+    outFile.create_group(b)
+
+
+    # ancillary data   
+    g='ancillary'      
+    outFile[b].create_group(g)
+    for d in self.ancArrListL2A:
+      jimlad=np.array(f[b][g][d])
+      outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
     return
 
 
@@ -96,7 +117,7 @@ class gediData(object):
 
     # loop over all arrays per shot
     for d in self.shotArrListL1B:
-      if((d=='rx_sample_start_index')|(d=='tx_sample_start_index')):  # skip these for noe
+      if((d=='rx_sample_start_index')|(d=='tx_sample_start_index')):  # skip these for now
         continue
       # read array
       jimlad=np.array(f[b][d])[useInd]
@@ -167,6 +188,7 @@ class gediData(object):
   def setRealList(self):
     '''Set list of all data within a real GEDI file'''
 
+    # L2B files
     # arrays with one element per shot
     self.shotArrListL1B=['all_samples_sum', 'beam', 'channel', 'delta_time', 'master_frac', 'master_int',\
                         'noise_mean_corrected', 'noise_stddev_corrected', 'nsemean_even', 'nsemean_odd',\
@@ -191,6 +213,13 @@ class gediData(object):
 
     self.corArrListL1B=['delta_time', 'dynamic_atmosphere_correction', 'geoid', 'tide_earth', 'tide_load', 'tide_ocean',\
                        'tide_ocean_pole', 'tide_pole']
+
+
+    # L2A files
+
+    self.ancArrListL2A=['l2a_alg_count']
+
+
 
     return
 
