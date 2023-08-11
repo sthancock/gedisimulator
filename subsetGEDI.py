@@ -58,11 +58,21 @@ class gediData(object):
       if('latitude_bin0' in list(f[b]['geolocation'])):  # L1B file
         self.subsetL1B(f,outFile,b,minX,maxX,minY,maxY)
       elif ('lat_lowestmode' in list(f[b]['geolocation'])):  # L2A file
-        print("Not yet")
+        self.subsetL2A(f,outFile,b,minX,maxX,minY,maxY)
 
     f.close()
     outFile.close()
     print("Written to",outNamen)
+    return
+
+
+  ###########################################
+
+  def subsetL2A(self,f,outFile,b,minX,maxX,minY,maxY):
+    '''Subset an L2A beam'''
+
+    print("Not ready yet")
+
     return
 
 
