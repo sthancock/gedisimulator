@@ -54,60 +54,74 @@ class gediData(object):
 
       print(b)
 
-      # read the coords and determine output
-      allLat=(np.array(f[b]['geolocation']['latitude_bin0'])+np.array(f[b]['geolocation']['latitude_lastbin']))/2.0
-      allLon=(np.array(f[b]['geolocation']['longitude_bin0'])+np.array(f[b]['geolocation']['longitude_lastbin']))/2.0
-      useInd=np.where((allLat>=minY)&(allLat<=maxY)&(allLon>=minX)&(allLon<=maxX))
-
-      if(len(useInd[0])>0):
-        useInd=useInd[0]
-      else:      # none in here
-        continue
-
-      # create the beam group
-      outFile.create_group(b)
-
-      # loop over all arrays per shot
-      for d in self.shotArrList:
-        if((d=='rx_sample_start_index')|(d=='tx_sample_start_index')):  # skip these for noe
-          continue
-        # read array
-        jimlad=np.array(f[b][d])[useInd]
-        # write subset to a new file
-        outFile[b].create_dataset(d,data=jimlad,compression='gzip')
-
-      # for txwaveform and rxwaveform, we must read start/stop indices
-      self.subsetWaves('rxwaveform','rx_sample_start_index','rx_sample_count',useInd,outFile[b],f[b])
-      self.subsetWaves('txwaveform','tx_sample_start_index','tx_sample_count',useInd,outFile[b],f[b])
-
-      # geolocation data
-      g='geolocation'
-      outFile[b].create_group(g)
-      for d in self.geoArrList:
-        if(d!='surface_type'):
-          jimlad=np.array(f[b][g][d])[useInd]
-          outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
-        else:
-          jimlad=np.array(f[b][g][d])[:,useInd]
-          outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
-
-      # ancillary data
-      g='ancillary'
-      outFile[b].create_group(g)
-      for d in self.ancArrList:
-        jimlad=np.array(f[b][g][d])
-        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
-
-      # geophys_corr
-      g='geophys_corr'
-      outFile[b].create_group(g)
-      for d in self.corArrList:
-        jimlad=np.array(f[b][g][d])[useInd]
-        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+      # determine whether L2A or L1B
+      if('latitude_bin0' in list(f[b]['geolocation'])):  # L1B file
+        self.subsetL1B(f,outFile,b,minX,maxX,minY,maxY)
+      elif ('lat_lowestmode' in list(f[b]['geolocation'])):  # L2A file
+        print("Not yet")
 
     f.close()
     outFile.close()
     print("Written to",outNamen)
+    return
+
+
+  ###########################################
+
+  def subsetL1B(self,f,outFile,b,minX,maxX,minY,maxY):
+    '''Subset an L1B beam'''
+
+    # read the coords and determine output
+    allLat=(np.array(f[b]['geolocation']['latitude_bin0'])+np.array(f[b]['geolocation']['latitude_lastbin']))/2.0
+    allLon=(np.array(f[b]['geolocation']['longitude_bin0'])+np.array(f[b]['geolocation']['longitude_lastbin']))/2.0
+    useInd=np.where((allLat>=minY)&(allLat<=maxY)&(allLon>=minX)&(allLon<=maxX))
+
+    if(len(useInd[0])>0):
+      useInd=useInd[0]
+    else:      # none in here
+      return
+
+    # create the beam group
+    outFile.create_group(b)
+
+    # loop over all arrays per shot
+    for d in self.shotArrListL1B:
+      if((d=='rx_sample_start_index')|(d=='tx_sample_start_index')):  # skip these for noe
+        continue
+      # read array
+      jimlad=np.array(f[b][d])[useInd]
+      # write subset to a new file
+      outFile[b].create_dataset(d,data=jimlad,compression='gzip')
+
+    # for txwaveform and rxwaveform, we must read start/stop indices
+    self.subsetWaves('rxwaveform','rx_sample_start_index','rx_sample_count',useInd,outFile[b],f[b])
+    self.subsetWaves('txwaveform','tx_sample_start_index','tx_sample_count',useInd,outFile[b],f[b])
+
+    # geolocation data
+    g='geolocation'
+    outFile[b].create_group(g)
+    for d in self.geoArrListL1B:
+      if(d!='surface_type'):
+        jimlad=np.array(f[b][g][d])[useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+      else:
+        jimlad=np.array(f[b][g][d])[:,useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
+    # ancillary data
+    g='ancillary'
+    outFile[b].create_group(g)
+    for d in self.ancArrListL1B:
+      jimlad=np.array(f[b][g][d])
+      outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
+    # geophys_corr
+    g='geophys_corr'
+    outFile[b].create_group(g)
+    for d in self.corArrListL1B:
+      jimlad=np.array(f[b][g][d])[useInd]
+      outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
     return
 
 
@@ -144,29 +158,29 @@ class gediData(object):
     '''Set list of all data within a real GEDI file'''
 
     # arrays with one element per shot
-    self.shotArrList=['all_samples_sum', 'beam', 'channel', 'delta_time', 'master_frac', 'master_int',\
-                      'noise_mean_corrected', 'noise_stddev_corrected', 'nsemean_even', 'nsemean_odd',\
-                      'rx_energy', 'rx_offset', 'rx_open', 'rx_sample_count',\
-                      'selection_stretchers_x', 'selection_stretchers_y', 'shot_number', 'stale_return_flag',\
-                      'th_left_used', 'tx_egamplitude', 'tx_egamplitude_error', 'tx_egbias', 'tx_egbias_error',\
-                      'tx_egflag', 'tx_eggamma', 'tx_eggamma_error', 'tx_egsigma', 'tx_egsigma_error', 'tx_gloc',\
-                      'tx_gloc_error', 'tx_pulseflag', 'tx_sample_count',]
+    self.shotArrListL1B=['all_samples_sum', 'beam', 'channel', 'delta_time', 'master_frac', 'master_int',\
+                        'noise_mean_corrected', 'noise_stddev_corrected', 'nsemean_even', 'nsemean_odd',\
+                        'rx_energy', 'rx_offset', 'rx_open', 'rx_sample_count',\
+                        'selection_stretchers_x', 'selection_stretchers_y', 'shot_number', 'stale_return_flag',\
+                        'th_left_used', 'tx_egamplitude', 'tx_egamplitude_error', 'tx_egbias', 'tx_egbias_error',\
+                        'tx_egflag', 'tx_eggamma', 'tx_eggamma_error', 'tx_egsigma', 'tx_egsigma_error', 'tx_gloc',\
+                        'tx_gloc_error', 'tx_pulseflag', 'tx_sample_count',]
 
-    self.geoArrList=['altitude_instrument', 'altitude_instrument_error', 'bounce_time_offset_bin0', 'bounce_time_offset_bin0_error',\
-                     'bounce_time_offset_lastbin', 'bounce_time_offset_lastbin_error', 'degrade', 'delta_time',\
-                     'digital_elevation_model', 'elevation_bin0', 'elevation_bin0_error', 'elevation_lastbin',\
-                     'elevation_lastbin_error', 'latitude_bin0', 'latitude_bin0_error', 'latitude_instrument',\
-                     'latitude_instrument_error', 'latitude_lastbin', 'latitude_lastbin_error', 'local_beam_azimuth',\
-                     'local_beam_azimuth_error', 'local_beam_elevation', 'local_beam_elevation_error', 'longitude_bin0',\
-                     'longitude_bin0_error', 'longitude_instrument', 'longitude_instrument_error', 'longitude_lastbin',\
-                     'longitude_lastbin_error', 'mean_sea_surface', 'neutat_delay_derivative_bin0', 'neutat_delay_derivative_lastbin',\
-                     'neutat_delay_total_bin0', 'neutat_delay_total_lastbin', 'range_bias_correction', 'shot_number',\
-                     'solar_azimuth', 'solar_elevation', 'surface_type']
+    self.geoArrListL1B=['altitude_instrument', 'altitude_instrument_error', 'bounce_time_offset_bin0', 'bounce_time_offset_bin0_error',\
+                       'bounce_time_offset_lastbin', 'bounce_time_offset_lastbin_error', 'degrade', 'delta_time',\
+                       'digital_elevation_model', 'elevation_bin0', 'elevation_bin0_error', 'elevation_lastbin',\
+                       'elevation_lastbin_error', 'latitude_bin0', 'latitude_bin0_error', 'latitude_instrument',\
+                       'latitude_instrument_error', 'latitude_lastbin', 'latitude_lastbin_error', 'local_beam_azimuth',\
+                       'local_beam_azimuth_error', 'local_beam_elevation', 'local_beam_elevation_error', 'longitude_bin0',\
+                       'longitude_bin0_error', 'longitude_instrument', 'longitude_instrument_error', 'longitude_lastbin',\
+                       'longitude_lastbin_error', 'mean_sea_surface', 'neutat_delay_derivative_bin0', 'neutat_delay_derivative_lastbin',\
+                       'neutat_delay_total_bin0', 'neutat_delay_total_lastbin', 'range_bias_correction', 'shot_number',\
+                       'solar_azimuth', 'solar_elevation', 'surface_type']
 
-    self.ancArrList=['master_time_epoch', 'mean_samples', 'smoothing_width']
+    self.ancArrListL1B=['master_time_epoch', 'mean_samples', 'smoothing_width']
 
-    self.corArrList=['delta_time', 'dynamic_atmosphere_correction', 'geoid', 'tide_earth', 'tide_load', 'tide_ocean',\
-                     'tide_ocean_pole', 'tide_pole']
+    self.corArrListL1B=['delta_time', 'dynamic_atmosphere_correction', 'geoid', 'tide_earth', 'tide_load', 'tide_ocean',\
+                       'tide_ocean_pole', 'tide_pole']
 
     return
 
