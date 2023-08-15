@@ -71,9 +71,6 @@ class gediData(object):
   def subsetL2A(self,f,outFile,b,minX,maxX,minY,maxY):
     '''Subset an L2A beam'''
 
-
-    print("Need to add RH and others")
-
     # read the coords and determine output
     allLat=np.array(f[b]['lat_lowestmode'])
     allLon=np.array(f[b]['lon_lowestmode'])
@@ -245,10 +242,8 @@ class gediData(object):
 
 
     # L2A files
-# 'rh',
-
     # element per shot
-    self.shotArrListL2A=['beam','channel','degrade_flag','delta_time','digital_elevation_model','digital_elevation_model_srtm',\
+    self.shotArrListL2A=['rh','beam','channel','degrade_flag','delta_time','digital_elevation_model','digital_elevation_model_srtm',\
                        'elev_highestreturn','elev_lowestmode','elevation_bias_flag','elevation_bin0_error','energy_total',\
                        'lat_highestreturn', 'lat_lowestmode', 'latitude_bin0_error', 'lon_highestreturn', 'lon_lowestmode',\
                        'longitude_bin0_error','master_frac','master_int','mean_sea_surface','num_detectedmodes','quality_flag',\
