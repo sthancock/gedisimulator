@@ -72,7 +72,7 @@ class gediData(object):
     '''Subset an L2A beam'''
 
 
-    print("Need to add hr and others")
+    print("Need to add RH and others")
 
     # read the coords and determine output
     allLat=np.array(f[b]['lat_lowestmode'])
@@ -87,14 +87,23 @@ class gediData(object):
     # create the beam group
     outFile.create_group(b)
 
-
-
     # loop over all arrays per shot
     for d in self.shotArrListL2A:
       # read array
       jimlad=np.array(f[b][d])[useInd]
       # write subset to a new file
       outFile[b].create_dataset(d,data=jimlad,compression='gzip')
+
+    # string fixed array lengths
+    for d in self.strArrListL2A:
+      jimlad=np.array(f[b][d])
+      # find maximum length
+      maxLen=0
+      for n in jimlad:
+        if(len(n)>maxLen):
+          maxLen=len(n)
+      asciiList = [n.encode("ascii", "ignore") for n in jimlad]
+      outFile[b].create_dataset(d, (len(asciiList),1),'S10', asciiList)
 
     # geolocation data
     g='geolocation'
@@ -208,7 +217,7 @@ class gediData(object):
   def setRealList(self):
     '''Set list of all data within a real GEDI file'''
 
-    # L2B files
+    # L1B files
     # arrays with one element per shot
     self.shotArrListL1B=['all_samples_sum', 'beam', 'channel', 'delta_time', 'master_frac', 'master_int',\
                         'noise_mean_corrected', 'noise_stddev_corrected', 'nsemean_even', 'nsemean_odd',\
@@ -236,10 +245,9 @@ class gediData(object):
 
 
     # L2A files
-# 'land_cover_data', 
 # 'rh',
-# 'rx_1gaussfit', 'rx_assess', 'rx_processing_a1', 'rx_processing_a2', 'rx_processing_a3', 'rx_processing_a4', 'rx_processing_a5', 'rx_processing_a6', 
 
+    # element per shot
     self.shotArrListL2A=['beam','channel','degrade_flag','delta_time','digital_elevation_model','digital_elevation_model_srtm',\
                        'elev_highestreturn','elev_lowestmode','elevation_bias_flag','elevation_bin0_error','energy_total',\
                        'lat_highestreturn', 'lat_lowestmode', 'latitude_bin0_error', 'lon_highestreturn', 'lon_lowestmode',\
@@ -247,6 +255,7 @@ class gediData(object):
                        'selected_algorithm','selected_mode','selected_mode_flag','sensitivity','shot_number','solar_azimuth',\
                        'solar_elevation','surface_flag']
 
+    # geolocation. Element per shot
     self.geoArrListL2A=['elev_highestreturn_a1', 'elev_highestreturn_a2', 'elev_highestreturn_a3', 'elev_highestreturn_a4', \
                        'elev_highestreturn_a5', 'elev_highestreturn_a6', 'elev_lowestmode_a1', 'elev_lowestmode_a2', 'elev_lowestmode_a3',\
                        'elev_lowestmode_a4', 'elev_lowestmode_a5', 'elev_lowestmode_a6', 'elev_lowestreturn_a1', 'elev_lowestreturn_a2',\
@@ -268,7 +277,14 @@ class gediData(object):
                        'quality_flag_a6', 'rh_a1', 'rh_a2', 'rh_a3', 'rh_a4', 'rh_a5', 'rh_a6', 'sensitivity_a1', 'sensitivity_a2', \
                        'sensitivity_a3', 'sensitivity_a4', 'sensitivity_a5', 'sensitivity_a6', 'shot_number', 'stale_return_flag']
 
+    # Fixed number of elements
+    self.strArrListL2A=['land_cover_data','rx_1gaussfit','rx_assess','rx_processing_a1','rx_processing_a2','rx_processing_a3',\
+                        'rx_processing_a4','rx_processing_a5','rx_processing_a6']
+
+    # ancillary
     self.ancArrListL2A=['l2a_alg_count']
+
+
 
     return
 
