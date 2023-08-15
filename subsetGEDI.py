@@ -57,7 +57,7 @@ class gediData(object):
       # determine whether L2A or L1B
       if('latitude_bin0' in list(f[b]['geolocation'])):  # L1B file
         self.subsetL1B(f,outFile,b,minX,maxX,minY,maxY)
-      elif ('lat_lowestmode' in list(f[b])):  # L2A file
+      elif ('lat_lowestmode' in list(f[b])):             # L2A file
         self.subsetL2A(f,outFile,b,minX,maxX,minY,maxY)
 
     f.close()
