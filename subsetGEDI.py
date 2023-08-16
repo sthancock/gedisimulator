@@ -68,7 +68,7 @@ class gediData(object):
         fileFormat="L2B"
 
     # write metadata group if needed
-    if(fileFormat=="L2A"|fileFormat=="L2B"):
+    if((fileFormat=="L2A")|(fileFormat=="L2B")):
       self.metadataL2A(f,outFile)
 
     f.close()
