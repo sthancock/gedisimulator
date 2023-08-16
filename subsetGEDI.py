@@ -38,12 +38,14 @@ class gediData(object):
     f=h5py.File(filename,'r')
     self.beamList=['BEAM0000', 'BEAM0001', 'BEAM0010', 'BEAM0011', 'BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011']
     self.nWaves=0
+    fileFormat=None
 
     # open output file
     outFile=h5py.File(outNamen,'w')
 
     # set directory list
     self.setRealList()
+
 
     # loop over beams
     for b in self.beamList:
@@ -57,8 +59,14 @@ class gediData(object):
       # determine whether L2A or L1B
       if('latitude_bin0' in list(f[b]['geolocation'])):  # L1B file
         self.subsetL1B(f,outFile,b,minX,maxX,minY,maxY)
+        fileFormat="L1B"
       elif ('lat_lowestmode' in list(f[b])):             # L2A file
         self.subsetL2A(f,outFile,b,minX,maxX,minY,maxY)
+        fileFormat="L2A"
+
+    # write metadata group if needed
+    if(fileFormat=="L2A"):
+      self.metadataL2A(f,outFile)
 
     f.close()
     outFile.close()
@@ -208,6 +216,17 @@ class gediData(object):
 
     return
 
+
+  ###########################################
+
+  def metadataL2A(self,f,outFile):
+    '''Write metadata group for L2A file'''
+
+    g='METADATA'
+    outFile.create_group(g)
+    outFile[g].create_group('DatasetIdentification')
+
+    return
 
   ###########################################
 
