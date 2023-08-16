@@ -57,12 +57,15 @@ class gediData(object):
       print(b)
 
       # determine whether L2A or L1B
-      if('latitude_bin0' in list(f[b]['geolocation'])):  # L1B file
+      if('rxwaveform' in list(f[b])):  # L1B file
         self.subsetL1B(f,outFile,b,minX,maxX,minY,maxY)
         fileFormat="L1B"
-      elif ('lat_lowestmode' in list(f[b])):             # L2A file
+      elif ('rh' in list(f[b])):             # L2A file
         self.subsetL2A(f,outFile,b,minX,maxX,minY,maxY)
         fileFormat="L2A"
+      elif ('pai' in list(f[b])):             # L2B file  
+        self.subsetL2B(f,outFile,b,minX,maxX,minY,maxY)
+        fileFormat="L2B"
 
     # write metadata group if needed
     if(fileFormat=="L2A"):
@@ -71,6 +74,34 @@ class gediData(object):
     f.close()
     outFile.close()
     print("Written to",outNamen)
+    return
+
+
+  ###########################################
+
+  def subsetL2B(self,f,outFile,b,minX,maxX,minY,maxY):
+    '''Subset an L2B beam'''
+
+    # read the coords and determine output
+    allLat=np.array(f[b]['geolocation']['lat_lowestmode'])
+    allLon=np.array(f[b]['geolocation']['lon_lowestmode'])
+    useInd=np.where((allLat>=minY)&(allLat<=maxY)&(allLon>=minX)&(allLon<=maxX))
+
+    if(len(useInd[0])>0):
+      useInd=useInd[0]
+    else:      # none in here
+      return
+
+    # create the beam group
+    outFile.create_group(b)
+
+    # loop over all arrays per shot
+    for d in self.shotArrListL2B:
+      # read array
+      jimlad=np.array(f[b][d])[useInd]
+      # write subset to a new file
+      outFile[b].create_dataset(d,data=jimlad,compression='gzip')
+
     return
 
 
@@ -298,6 +329,18 @@ class gediData(object):
     # ancillary
     self.ancArrListL2A=['l2a_alg_count']
 
+
+    # array per shot
+    self.shotArrListL2B=['algorithmrun_flag','beam','channel','cover','cover_z','delta_time','fhd_normal','l2a_quality_flag','l2b_quality_flag',\
+                         'master_frac','master_int','num_detectedmodes','omega','pai','pai_z','pavd_z','pgap_theta','pgap_theta_error','rg',\
+                         'rh100','rhog','rhog_error', 'rhov', 'rhov_error','rossg','rv','rx_range_highestreturn','rx_sample_count',\
+                         'rx_sample_start_index','selected_l2a_algorithm','selected_mode','selected_mode_flag','selected_rg_algorithm',\
+                         'sensitivity','shot_number','stale_return_flag','surface_flag']
+
+#['ancillary', 'geolocation', 
+# 'land_cover_data', 
+# 'pgap_theta_z', 
+# 'rx_processing', 
 
 
     return
