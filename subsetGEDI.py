@@ -68,7 +68,7 @@ class gediData(object):
         fileFormat="L2B"
 
     # write metadata group if needed
-    if(fileFormat=="L2A"):
+    if(fileFormat=="L2A"|fileFormat=="L2B"):
       self.metadataL2A(f,outFile)
 
     f.close()
@@ -97,10 +97,44 @@ class gediData(object):
 
     # loop over all arrays per shot
     for d in self.shotArrListL2B:
+      if((d=='rx_sample_start_index')|(d=='tx_sample_start_index')):  # skip these for now
+        continue
       # read array
       jimlad=np.array(f[b][d])[useInd]
       # write subset to a new file
       outFile[b].create_dataset(d,data=jimlad,compression='gzip')
+
+    # geolocation
+    g='geolocation'
+    outFile[b].create_group(g)
+    for d in self.geoArrListL2B:
+      if(d!='surface_type'):
+        jimlad=np.array(f[b][g][d])[useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+      else:
+        jimlad=np.array(f[b][g][d])[:,useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
+    # ancillary data   
+    g='ancillary'
+    outFile[b].create_group(g)
+    for d in self.ancArrListL2B:
+      jimlad=np.array(f[b][g][d])
+      outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
+    # string fixed array lengths
+    for d in self.strArrListL2B:
+      jimlad=np.array(f[b][d])
+      # find maximum length
+      maxLen=0
+      for n in jimlad:
+        if(len(n)>maxLen):
+          maxLen=len(n)
+      asciiList = [n.encode("ascii", "ignore") for n in jimlad]
+      outFile[b].create_dataset(d, (len(asciiList),1),'S10', asciiList)
+
+    # Variable length array
+    self.subsetWaves('pgap_theta_z','rx_sample_start_index','rx_sample_count',useInd,outFile[b],f[b])
 
     return
 
@@ -291,7 +325,7 @@ class gediData(object):
                        'tide_ocean_pole', 'tide_pole']
 
 
-    # L2A files
+    ## L2A files
     # element per shot
     self.shotArrListL2A=['rh','beam','channel','degrade_flag','delta_time','digital_elevation_model','digital_elevation_model_srtm',\
                        'elev_highestreturn','elev_lowestmode','elevation_bias_flag','elevation_bin0_error','energy_total',\
@@ -330,6 +364,7 @@ class gediData(object):
     self.ancArrListL2A=['l2a_alg_count']
 
 
+    ## L2B
     # array per shot
     self.shotArrListL2B=['algorithmrun_flag','beam','channel','cover','cover_z','delta_time','fhd_normal','l2a_quality_flag','l2b_quality_flag',\
                          'master_frac','master_int','num_detectedmodes','omega','pai','pai_z','pavd_z','pgap_theta','pgap_theta_error','rg',\
@@ -337,11 +372,19 @@ class gediData(object):
                          'rx_sample_start_index','selected_l2a_algorithm','selected_mode','selected_mode_flag','selected_rg_algorithm',\
                          'sensitivity','shot_number','stale_return_flag','surface_flag']
 
-#['ancillary', 'geolocation', 
-# 'land_cover_data', 
-# 'pgap_theta_z', 
-# 'rx_processing', 
+    # geolocation. Element per shot
+    self.geoArrListL2B=['degrade_flag','delta_time','digital_elevation_model','elev_highestreturn','elev_lowestmode','elevation_bin0',\
+                        'elevation_bin0_error','elevation_lastbin','elevation_lastbin_error','height_bin0','height_lastbin',\
+                        'lat_highestreturn','lat_lowestmode','latitude_bin0','latitude_bin0_error','latitude_lastbin','latitude_lastbin_error',\
+                        'local_beam_azimuth','local_beam_elevation','lon_highestreturn','lon_lowestmode','longitude_bin0','longitude_bin0_error',\
+                        'longitude_lastbin','longitude_lastbin_error','shot_number','solar_azimuth','solar_elevation']
 
+    # ancillary
+    self.ancArrListL2B=['dz','l2a_alg_count','maxheight_cuttoff','rg_eg_constraint_center_buffer','rg_eg_mpfit_max_func_evals',\
+                        'rg_eg_mpfit_maxiters','rg_eg_mpfit_tolerance','signal_search_buff','tx_noise_stddev_multiplier']
+
+    # Fixed number of elements
+    self.strArrListL2B=['land_cover_data','rx_processing']
 
     return
 
