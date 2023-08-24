@@ -1571,6 +1571,8 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
   void setGEDIzenith(gediHDF *,int,uint16_t *);
   void setGEDIwaveID(gediHDF *,int,uint64_t *,int *,char *);
   void readGEDIwaveform(hid_t,int *,uint64_t *,int,gediHDF *,int *,char *);
+  void gediWaveformsFromL2A(hid_t,int,gediHDF *,int *);
+
 
   /*set the list of beams*/
   beamList=setGEDIbeamList(&nBeams,gediIO->useBeam);
@@ -1659,7 +1661,7 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
         readGEDIwaveform(group,&nSamps,sInds,nUse,hdfData,useInd,&l1b);
         TIDY(sInds);
       }else if(l2a){       /*L2A format*/
-
+        gediWaveformsFromL2A(group,nUse,hdfData,useInd);
       }/*format check*/
 
 
@@ -1694,6 +1696,27 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
   }
   return;
 }/*readRealGediHDF*/
+
+
+/*####################################################*/
+/*read L2A RH metrics and make waveforms*/
+
+void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
+{
+  int i=0;
+
+  /*read ZG*/
+
+  /*read RH metrics*/
+
+  /*do I need a variable number of bins?*/
+
+
+  /*loop over shots and make waves*/
+
+
+  return;
+}/*gediWaveformsFromL2A*/
 
 
 /*####################################################*/
