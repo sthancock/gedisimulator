@@ -1611,8 +1611,8 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
     }
 
     /*geolocation*/
+    group2=H5Gopen2(group,"geolocation",H5P_DEFAULT);
     if((l2a==0)&&(l2b==0)){   /*then it is an l1 a or b file*/
-      group2=H5Gopen2(group,"geolocation",H5P_DEFAULT);
       temp1=read1dDoubleHDF5(group2,"longitude_bin0",&numb);
       temp2=read1dDoubleHDF5(group2,"longitude_lastbin",&numb);
       tempLon=meanCoord(temp1,temp2,numb);
@@ -1703,11 +1703,12 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
 
 void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
 {
-  int i=0;
+  int i=0,numb=0,nBins=0;
+  float *zG=NULL,*rh=NULL;
 
-  /*read ZG*/
-
-  /*read RH metrics*/
+  /*read ZG and RH*/
+  zG=read1dFloatHDF5(group,"elev_lowestmode",&numb);
+  rh=read2dFloatHDF5(group,"rh",&nBins,&numb);
 
   /*do I need a variable number of bins?*/
 
@@ -1715,6 +1716,12 @@ void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
   /*loop over shots and make waves*/
 
 
+  TIDY(zG);
+  TIDY(rh);
+
+
+fprintf(stderr,"Made it this far\n");
+exit(1);
   return;
 }/*gediWaveformsFromL2A*/
 
