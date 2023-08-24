@@ -1712,8 +1712,14 @@ void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
 
   /*do I need a variable number of bins?*/
 
+  /*I could use the lowest threshold algorithm to get as much signal as possible?*/
+
 
   /*loop over shots and make waves*/
+
+
+  /*other things to read*/
+  /*'sensitivity', 'quality_flag'?*/
 
 
   TIDY(zG);
