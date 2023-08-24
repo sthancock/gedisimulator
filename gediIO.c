@@ -1564,7 +1564,7 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
   double *temp1=NULL,*temp2=NULL;
   double *tempLon=NULL,*tempLat=NULL;
   double *meanCoord(double *,double *,int);
-  char l1b=0;     /*l1a or l1b flag*/
+  char l1b=0,l2a=0,l2b=0;     /*l1a or l1b flag*/
   char **beamList=NULL;
   char **setGEDIbeamList(int *,char *);
   void updateGEDInWaves(int,gediHDF *);
@@ -1594,18 +1594,37 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
     /*check whether this beam has data*/
     if(H5Lexists(group,"geolocation",H5P_DEFAULT)==0)continue;
 
+    /*determine whether L1B, L2A or other*/
+    if(H5Lexists(group,"rxwaveform",H5P_DEFAULT)){   /*L1B file*/
+      l2a=l2b=0;
+    }else if(H5Lexists(group,"rh",H5P_DEFAULT)){     /*L2A file*/
+      l2a=1;
+      l2b=0;
+    }else if(H5Lexists(group,"pai",H5P_DEFAULT)){    /*L2B file*/
+      fprintf(stderr,"Not ready for L2B files yet\n");
+      exit(1);
+    }else{
+      fprintf(stderr,"File format not recognised\n");
+      exit(1);
+    }
+
     /*geolocation*/
-    group2=H5Gopen2(group,"geolocation",H5P_DEFAULT);
-    temp1=read1dDoubleHDF5(group2,"longitude_bin0",&numb);
-    temp2=read1dDoubleHDF5(group2,"longitude_lastbin",&numb);
-    tempLon=meanCoord(temp1,temp2,numb);
-    TIDY(temp1);
-    TIDY(temp2);
-    temp1=read1dDoubleHDF5(group2,"latitude_bin0",&numb);
-    temp2=read1dDoubleHDF5(group2,"latitude_lastbin",&numb);
-    tempLat=meanCoord(temp1,temp2,numb);
-    TIDY(temp1);
-    TIDY(temp2);
+    if((l2a==0)&&(l2b==0)){   /*then it is an l1 a or b file*/
+      group2=H5Gopen2(group,"geolocation",H5P_DEFAULT);
+      temp1=read1dDoubleHDF5(group2,"longitude_bin0",&numb);
+      temp2=read1dDoubleHDF5(group2,"longitude_lastbin",&numb);
+      tempLon=meanCoord(temp1,temp2,numb);
+      TIDY(temp1);
+      TIDY(temp2);
+      temp1=read1dDoubleHDF5(group2,"latitude_bin0",&numb);
+      temp2=read1dDoubleHDF5(group2,"latitude_lastbin",&numb);
+      tempLat=meanCoord(temp1,temp2,numb);
+      TIDY(temp1);
+      TIDY(temp2);
+    }else{   /*L2A or B file*/
+      tempLon=read1dDoubleHDF5(group,"lon_lowestmode",&numb);
+      tempLat=read1dDoubleHDF5(group,"lat_lowestmode",&numb);
+    }
 
 
     /*which are within bounds?*/
@@ -1623,27 +1642,33 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
       TIDY(tempLon);
       TIDY(tempLat);
 
-      temp1=read1dDoubleHDF5(group2,"elevation_bin0",&numb);
-      for(j=0;j<nUse;j++)hdfData->z0[j+hdfData->nWaves]=(float)temp1[useInd[j]];
-      TIDY(temp1);
-      temp1=read1dDoubleHDF5(group2,"elevation_lastbin",&numb);
-      for(j=0;j<nUse;j++)hdfData->zN[j+hdfData->nWaves]=(float)temp1[useInd[j]];
-      TIDY(temp1);
+      /*read waveforms*/
+      if((l2a==0)&&(l2b==0)){  /*L1A/B format*/
+        temp1=read1dDoubleHDF5(group2,"elevation_bin0",&numb);
+        for(j=0;j<nUse;j++)hdfData->z0[j+hdfData->nWaves]=(float)temp1[useInd[j]];
+        TIDY(temp1);
+        temp1=read1dDoubleHDF5(group2,"elevation_lastbin",&numb);
+        for(j=0;j<nUse;j++)hdfData->zN[j+hdfData->nWaves]=(float)temp1[useInd[j]];
+        TIDY(temp1);
 
-      /*waveform*/
-      nBins=read1dUint16HDF5(group,"rx_sample_count",&numb);
-      for(j=0;j<nUse;j++)hdfData->nBins[j+hdfData->nWaves]=(int)nBins[useInd[j]];
-      TIDY(nBins);
-      sInds=read1dUint64HDF5(group,"rx_sample_start_index",&numb);
-      readGEDIwaveform(group,&nSamps,sInds,nUse,hdfData,useInd,&l1b);
-      TIDY(sInds);
+        /*waveform*/
+        nBins=read1dUint16HDF5(group,"rx_sample_count",&numb);
+        for(j=0;j<nUse;j++)hdfData->nBins[j+hdfData->nWaves]=(int)nBins[useInd[j]];
+        TIDY(nBins);
+        sInds=read1dUint64HDF5(group,"rx_sample_start_index",&numb);
+        readGEDIwaveform(group,&nSamps,sInds,nUse,hdfData,useInd,&l1b);
+        TIDY(sInds);
+      }else if(l2a){       /*L2A format*/
+
+      }/*format check*/
+
 
       /*calculate zenith angles from elevations*/
       setGEDIzenith(hdfData,numb,nBins);
       TIDY(nBins);
 
       /*if it is an L1B file read the solar elevation*/
-      if(l1b){
+      if(l1b||l2a||l2b){
         temp1=read1dDoubleHDF5(group2,"solar_elevation",&numb);
         for(j=0;j<nUse;j++)hdfData->solarElev[j+hdfData->nWaves]=(float)temp1[useInd[j]];
         TIDY(temp1);
