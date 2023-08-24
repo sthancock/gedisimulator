@@ -967,7 +967,7 @@ double *setDEMl1b(gediHDF *hdfData,int useInt)
     /*loop over waves*/
     for(i=0;i<hdfData->nWaves;i++){
       tempDouble[i]=contN=0.0;
-      res=(double)(hdfData->z0[i]-hdfData->zN[i])/(double)hdfData->nBins[0];
+      res=(double)(hdfData->z0[i]-hdfData->zN[i])/(double)(hdfData->nBins[0]-1);
       /*calculate CofG*/
       for(j=0;j<hdfData->nBins[0];j++){
         z=(double)hdfData->z0[i]-(double)j*res;
@@ -2208,7 +2208,7 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
   /*copy header*/
   if(hdfGedi[0]->varBins==0)data->nBins=hdfGedi[0]->nBins[0];
   else                      data->nBins=hdfGedi[0]->nBins[numb];
-  data->res=fabs(hdfGedi[0]->z0[numb]-hdfGedi[0]->zN[numb])/(float)data->nBins;
+  data->res=fabs(hdfGedi[0]->z0[numb]-hdfGedi[0]->zN[numb])/(float)(data->nBins-1);
   data->nWaveTypes=hdfGedi[0]->nTypeWaves;
   if(data->nWaveTypes<=0)data->nWaveTypes=1;
   data->useType=0;
@@ -2476,7 +2476,7 @@ dataStruct *unpackHDFlvis(char *namen,lvisHDF **hdfLvis,gediIOstruct *gediIO,int
 
   /*copy data to structure*/
   data->zen=hdfLvis[0]->zen[numb];
-  data->res=fabs(hdfLvis[0]->z0[numb]-hdfLvis[0]->z1023[numb])/(float)hdfLvis[0]->nBins;
+  data->res=fabs(hdfLvis[0]->z0[numb]-hdfLvis[0]->z1023[numb])/(float)(hdfLvis[0]->nBins-1);
   if(gediIO->den)gediIO->den->res=data->res;
   if(gediIO->gFit)gediIO->gFit->res=data->res;
   data->totE[data->useType]=0.0;
@@ -2642,7 +2642,7 @@ dataStruct *readBinaryLVIS(char *namen,lvisLGWstruct *lvis,int numb,gediIOstruct
 
   /*copy data to structure*/
   data->zen=lvis->data[numb].zen;
-  data->res=(lvis->data[numb].z0-lvis->data[numb].z431)/(float)lvis->nBins;
+  data->res=(lvis->data[numb].z0-lvis->data[numb].z431)/(float)(lvis->nBins-1);
   if(gediIO->den)gediIO->den->res=data->res;
   if(gediIO->gFit)gediIO->gFit->res=data->res;
   data->totE[data->useType]=0.0;
