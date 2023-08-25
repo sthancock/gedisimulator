@@ -1703,31 +1703,85 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
 
 void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
 {
-  int i=0,numb=0,nBins=0;
-  float *zG=NULL,*rh=NULL;
+  int i=0,j=0,ind=0;
+  int nWaves=0,nBins=0;
+  int lastInd=0;
+  uint64_t totBins=0;
+  uint64_t offset=0;
+  float z=0;
+  float *zG=NULL,**rh=NULL;
+  float buff=0,res=0;
+  float minZ=0,maxZ=0;
+
+  /*to add before and after*/
+  buff=20.0;
+  res=0.15;
 
   /*read ZG and RH*/
-  zG=read1dFloatHDF5(group,"elev_lowestmode",&numb);
-  rh=read2dFloatHDF5(group,"rh",&nBins,&numb);
-
-  /*do I need a variable number of bins?*/
-
-  /*I could use the lowest threshold algorithm to get as much signal as possible?*/
+  zG=read1dFloatHDF5(group,"elev_lowestmode",&nWaves);
+  rh=read2dFloatHDF5(group,"rh",&nBins,&nWaves);
 
 
-  /*loop over shots and make waves*/
+  /*count number of bins*/
+  /*number of bins in this section and find offsets*/
+  totBins=0;
+  for(i=0;i<nUse;i++){
+    ind=useInd[i];
 
+    /*determine dimensions*/
+    minZ=zG[ind]+rh[ind][0]-buff;
+    maxZ=zG[ind]+rh[ind][100]+buff;
+    hdfData->z0[i+hdfData->nWaves]=maxZ;
+    hdfData->zN[i+hdfData->nWaves]=minZ;
+
+    /*record number of bins*/
+    hdfData->nBins[i+hdfData->nWaves]=(int)((maxZ-minZ)/res+1.0);
+
+    totBins+=(uint64_t)hdfData->nBins[i+hdfData->nWaves];
+    if(ind>0)hdfData->sInd[ind]=hdfData->sInd[ind-1]+(uint64_t)hdfData->nBins[ind-1];
+    else     hdfData->sInd[ind]=0;
+  }
+
+
+  /*allocate space if needed*/
+  if(hdfData->nWaves==0){
+    hdfData->wave=fFalloc(1,"wave",0);
+    hdfData->wave[0]=falloc((uint64_t)totBins,"wave",0);
+    offset=0;
+  }else{
+    offset=hdfData->sInd[hdfData->nWaves];
+    if(!(hdfData->wave[0]=(float *)realloc(hdfData->wave[0],(totBins+offset)*(uint64_t)sizeof(float)))){
+      fprintf(stderr,"Error in reallocation, allocating %lu\n",(totBins+offset)*(uint64_t)sizeof(float *));
+      exit(1);
+    }
+  }
+
+  /*loop over waveforms*/
+  for(i=0;i<nUse;i++){
+    ind=useInd[i];
+    offset=hdfData->sInd[i+hdfData->nWaves];
+
+    /*set to zero*/
+    for(j=0;j<hdfData->nBins[i+hdfData->nWaves];j++)hdfData->wave[0][j+offset]=0.0;
+
+    /*add energy*/
+    lastInd=100;
+    for(j=0;j<hdfData->nBins[i+hdfData->nWaves];j++){
+      z=(hdfData->z0[i+hdfData->nWaves]-(float)j*res)-zG[ind];  /*height above ground*/
+
+      while(z<=rh[ind][lastInd]){
+        hdfData->wave[0][j+offset]+=0.01;
+        lastInd--;
+      }
+    }
+  }
+  /*variable number of bins is assumed*/
 
   /*other things to read*/
   /*'sensitivity', 'quality_flag'?*/
 
-
   TIDY(zG);
   TIDY(rh);
-
-
-fprintf(stderr,"Made it this far\n");
-exit(1);
   return;
 }/*gediWaveformsFromL2A*/
 
@@ -3441,7 +3495,6 @@ void setGediPulse(gediIOstruct *gediIO,gediRatStruct *gediRat)
 void setPeakChirp(pulseStruct *pulse)
 {
   int i=0,numb=0;
-  int startInd=0;
   int status=0;
   int gsl_fft_complex_radix2_forward(gsl_complex_packed_array,size_t,size_t);
   float maxAmp=0,thresh=0.0;
@@ -3477,7 +3530,6 @@ void setPeakChirp(pulseStruct *pulse)
   for(i=0;i<numb/2;i++){
     if(!hasStarted){
       if(absData[i]>=thresh)hasStarted=1;
-      startInd=i;
     }else{
       if(absData[i]<=thresh)break;
     }
