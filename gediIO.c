@@ -1560,7 +1560,7 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
   uint16_t *nBins=NULL;
   uint64_t *sInds=NULL;
   uint64_t *shotN=NULL;
-  hid_t group=0,group2=0;
+  hid_t group=0,group2=0,thisGroup=0;
   double *temp1=NULL,*temp2=NULL;
   double *tempLon=NULL,*tempLat=NULL;
   double *meanCoord(double *,double *,int);
@@ -1671,7 +1671,9 @@ void readRealGediHDF(hid_t file,gediIOstruct *gediIO,char *namen,gediHDF *hdfDat
 
       /*if it is an L1B file read the solar elevation*/
       if(l1b||l2a||l2b){
-        temp1=read1dDoubleHDF5(group2,"solar_elevation",&numb);
+        if(l1b)thisGroup=group2;
+        else   thisGroup=group;
+        temp1=read1dDoubleHDF5(thisGroup,"solar_elevation",&numb);
         for(j=0;j<nUse;j++)hdfData->solarElev[j+hdfData->nWaves]=(float)temp1[useInd[j]];
         TIDY(temp1);
       }
