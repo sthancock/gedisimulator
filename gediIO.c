@@ -1709,7 +1709,7 @@ void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
   int nWaves=0,nBins=0;
   int lastInd=0;
   uint64_t totBins=0;
-  uint64_t offset=0;
+  uint64_t offset=0,hdfInd=0;
   float z=0;
   float *zG=NULL,**rh=NULL;
   float buff=0,res=0;
@@ -1729,19 +1729,20 @@ void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
   totBins=0;
   for(i=0;i<nUse;i++){
     ind=useInd[i];
+    hdfInd=i+hdfData->nWaves;
 
     /*determine dimensions*/
     minZ=zG[ind]+rh[ind][0]-buff;
     maxZ=zG[ind]+rh[ind][100]+buff;
-    hdfData->z0[i+hdfData->nWaves]=maxZ;
-    hdfData->zN[i+hdfData->nWaves]=minZ;
+    hdfData->z0[hdfInd]=maxZ;
+    hdfData->zN[hdfInd]=minZ;
 
     /*record number of bins*/
-    hdfData->nBins[i+hdfData->nWaves]=(int)((maxZ-minZ)/res+1.0);
+    hdfData->nBins[hdfInd]=(int)((maxZ-minZ)/res+1.0);
 
     totBins+=(uint64_t)hdfData->nBins[i+hdfData->nWaves];
-    if(ind>0)hdfData->sInd[ind]=hdfData->sInd[ind-1]+(uint64_t)hdfData->nBins[ind-1];
-    else     hdfData->sInd[ind]=0;
+    if(hdfInd>0)hdfData->sInd[hdfInd]=hdfData->sInd[hdfInd-1]+(uint64_t)hdfData->nBins[hdfInd-1];
+    else        hdfData->sInd[hdfInd]=0;
   }
 
 
@@ -1761,15 +1762,16 @@ void gediWaveformsFromL2A(hid_t group,int nUse,gediHDF *hdfData,int *useInd)
   /*loop over waveforms*/
   for(i=0;i<nUse;i++){
     ind=useInd[i];
+    hdfInd=i+hdfData->nWaves;
     offset=hdfData->sInd[i+hdfData->nWaves];
 
     /*set to zero*/
-    for(j=0;j<hdfData->nBins[i+hdfData->nWaves];j++)hdfData->wave[0][j+offset]=0.0;
+    for(j=0;j<hdfData->nBins[hdfInd];j++)hdfData->wave[0][j+offset]=0.0;
 
     /*add energy*/
     lastInd=100;
-    for(j=0;j<hdfData->nBins[i+hdfData->nWaves];j++){
-      z=(hdfData->z0[i+hdfData->nWaves]-(float)j*res)-zG[ind];  /*height above ground*/
+    for(j=0;j<hdfData->nBins[hdfInd];j++){
+      z=(hdfData->z0[hdfInd]-(float)j*res)-zG[ind];  /*height above ground*/
 
       while(z<=rh[ind][lastInd]){
         hdfData->wave[0][j+offset]+=0.01;
