@@ -1741,7 +1741,7 @@ void readGEDIwaveform(hid_t group,int *nSamps,uint64_t *sInds,int nUse,gediHDF *
   float *tempF=NULL;
   hid_t dset,dtype;
   herr_t status;
-  void unwrapRealGEDI(uint16_t *,float *,uint64_t *,int,int,gediHDF *,int *);
+  void unwrapRealGEDI(uint16_t *,float *,uint64_t *,int,gediHDF *,int *);
 
   /*read data dtype*/
   dset=H5Dopen2(group,"rxwaveform",H5P_DEFAULT);
@@ -1771,7 +1771,7 @@ void readGEDIwaveform(hid_t group,int *nSamps,uint64_t *sInds,int nUse,gediHDF *
   }
 
   /*unpack and pad all waves to have the same number of bins*/
-  unwrapRealGEDI(tempI,tempF,sInds,*nSamps,nUse,hdfData,useInd);
+  unwrapRealGEDI(tempI,tempF,sInds,nUse,hdfData,useInd);
 
   TIDY(tempI);
   TIDY(tempF);
@@ -1928,7 +1928,7 @@ int findGDAlVerMaj()
 /*####################################################*/
 /*unwrap real GEDI data*/
 
-void unwrapRealGEDI(uint16_t *tempI,float *tempF,uint64_t *sInds,int nSamps,int nUse,gediHDF *hdfData,int *useInd)
+void unwrapRealGEDI(uint16_t *tempI,float *tempF,uint64_t *sInds,int nUse,gediHDF *hdfData,int *useInd)
 {
   int i=0,j=0,ind=0;
   uint64_t totBins=0;
