@@ -2639,6 +2639,9 @@ control *readCommands(int argc,char **argv)
       }else if(!strncasecmp(argv[i],"-noiseMult",10)){
         checkArguments(1,i,argc,"-noiseMult");
         dimage->photonCount.noise_mult=atof(argv[++i]);
+      }else if(!strncasecmp(argv[i],"-noisePhotons",13)){
+        checkArguments(1,i,argc,"-noisePhotons");
+        dimage->photonCount.noise_mult=-1.0*atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-nPhotG",7)){
         checkArguments(1,i,argc,"-nPhotG");
         dimage->photonCount.nPhotG=atof(argv[++i]);

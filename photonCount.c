@@ -628,8 +628,8 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
   nPhotons=(int)pickArrayElement(photThresh,photonCount->prob,photonCount->pBins,1);
 
   /*generate noise photons*/
-  if(photonCount->noise_mult>TOL)nNoise=setNumberNoise(data->cov,photonCount->noise_mult,photonCount->H);
-  else                           nNoise=0;
+  if(fabs(photonCount->noise_mult)>TOL)nNoise=setNumberNoise(data->cov,photonCount->noise_mult,photonCount->H);
+  else                                 nNoise=0;
   *nPhot=nPhotons+nNoise;
 
   /*allocate space*/
@@ -886,7 +886,7 @@ int setNumberNoise(float cov,float noise_mult,float H)
   photonStruct tempPhot;
 
   /*is any noise being added?*/
-  if(noise_mult>TOL){
+  if(noise_mult>TOL){   /*noise defined as a rate*/
     /*surface reflectance*/
     /*if((cov<0.0)||(cov>1.0))cov=0.5;   OLD, for varying ground reflectance
     refl=cov*0.15+(1.0-cov)*0.22;*/  /*assuming ground and canopy reflectance values*/
@@ -896,6 +896,14 @@ int setNumberNoise(float cov,float noise_mult,float H)
     /*nNoise=(int)(50.0*(H/c)*noiseRate+0.5);  This is to match Kaitlin's matlab code, but unsure where the 50 came from*/
     tempPhot.designval=(H/c)*noiseRate;
 
+    /*pick from a Poisson*/
+    setPhotonProb(&tempPhot);
+    photThresh=(float)rand()/(float)RAND_MAX;
+    nNoise=(int)pickArrayElement(photThresh,tempPhot.prob,tempPhot.pBins,1);
+    TIDY(tempPhot.prob);
+  }else if(noise_mult<(-1.0*TOL)){  /*noise defined as mean number of photoins*/
+    /*mean numb3er of photons*/
+    tempPhot.designval=-1.0*noise_mult;   /*mean number of noise photons stored as a negative*/
     /*pick from a Poisson*/
     setPhotonProb(&tempPhot);
     photThresh=(float)rand()/(float)RAND_MAX;
