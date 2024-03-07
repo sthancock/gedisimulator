@@ -25,6 +25,7 @@ class gediData(object):
     and writes to a new file
     '''
 
+    self.doneAnc=False
     self.subsetGEDI(filename,minX,maxX,minY,maxY,outName)
 
 
@@ -56,7 +57,7 @@ class gediData(object):
 
       print(b)
 
-      # determine whether L2A or L1B
+      # determine what file version
       if('rxwaveform' in list(f[b])):  # L1B file
         self.subsetL1B(f,outFile,b,minX,maxX,minY,maxY)
         fileFormat="L1B"
@@ -66,6 +67,13 @@ class gediData(object):
       elif ('pai' in list(f[b])):             # L2B file  
         self.subsetL2B(f,outFile,b,minX,maxX,minY,maxY)
         fileFormat="L2B"
+      elif ('agbd' in list(f[b])):             # L4A file 
+        self.subsetL4A(f,outFile,b,minX,maxX,minY,maxY)
+        fileFormat="L4A"
+      else:
+        print('File format not known')
+        exit
+
 
     # write metadata group if needed
     if((fileFormat=="L2A")|(fileFormat=="L2B")):
@@ -74,6 +82,78 @@ class gediData(object):
     f.close()
     outFile.close()
     print("Written to",outNamen)
+    return
+
+
+  ###########################################
+
+  def subsetL4A(self,f,outFile,b,minX,maxX,minY,maxY):
+    '''Subset an L4A beam'''
+
+    # read the coords and determine output
+    allLat=np.array(f[b]['lat_lowestmode'])
+    allLon=np.array(f[b]['lon_lowestmode'])
+    useInd=np.where((allLat>=minY)&(allLat<=maxY)&(allLon>=minX)&(allLon<=maxX))
+
+    if(len(useInd[0])>0):
+      useInd=useInd[0]
+    else:      # none in here
+      return
+
+    # create the beam group
+    outFile.create_group(b)
+
+    # loop over all arrays per shot
+    for d in self.shotArrListL4A:
+      print(d)
+      # read array
+      jimlad=np.array(f[b][d])[useInd]
+      # write subset to a new file
+      outFile[b].create_dataset(d,data=jimlad,compression='gzip')
+
+    # string fixed array lengths
+    for d in self.strArrListL4A:
+      print(d)
+      jimlad=np.array(f[b][d])
+      # find maximum length
+      maxLen=0
+      for n in jimlad:
+        if(len(n)>maxLen):
+          maxLen=len(n)
+      asciiList = [n.encode("ascii", "ignore") for n in jimlad]
+      outFile[b].create_dataset(d, (len(asciiList),1),'S10', asciiList)
+
+    # geolocation data
+    g='geolocation'
+    outFile[b].create_group(g)
+    for d in self.geoArrListL4A:
+      print(d)
+      if(d!='surface_type'):
+        jimlad=np.array(f[b][g][d])[useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+      else:
+        jimlad=np.array(f[b][g][d])[:,useInd]
+        outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
+    if(self.doneAnc==False):
+      # ancillary data   
+      g='ANCILLARY'
+      outFile.create_group(g)
+      for d in self.ancArrListL4A:
+        print(d)
+        jimlad=np.array(f[g][d])
+        outFile[g].create_dataset(d,data=jimlad,compression='gzip')
+      self.doneAnc=True
+
+    # agbd bits
+    g='agbd_prediction'
+    outFile[b].create_group(g)
+    for d in self.agbdArrListL4A:
+      print(d)
+      jimlad=np.array(f[b][g][d])
+      outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
+
+
     return
 
 
@@ -385,6 +465,75 @@ class gediData(object):
 
     # Fixed number of elements
     self.strArrListL2B=['land_cover_data','rx_processing']
+
+
+    # L4A files
+    # arrays with one element per shot
+    self.shotArrListL4A=['agbd', 'agbd_pi_lower', 'agbd_pi_upper', 'agbd_se', 'agbd_t', 'agbd_t_se',\
+                         'algorithm_run_flag', 'beam', 'channel', 'degrade_flag', 'delta_time', 'elev_lowestmode', \
+                         'l2_quality_flag', 'l4_quality_flag', 'lat_lowestmode', 'lon_lowestmode',\
+                         'master_frac', 'master_int', 'predict_stratum', 'predictor_limit_flag', 'response_limit_flag',\
+                         'selected_algorithm', 'selected_mode', 'selected_mode_flag', 'sensitivity', 'shot_number',\
+                         'solar_elevation', 'surface_flag', 'xvar']
+
+    self.geoArrListL4A=['elev_lowestmode_a1', 'elev_lowestmode_a10', 'elev_lowestmode_a2', 'elev_lowestmode_a3',\
+                        'elev_lowestmode_a4', 'elev_lowestmode_a5', 'elev_lowestmode_a6', 'lat_lowestmode_a1',\
+                        'lat_lowestmode_a10', 'lat_lowestmode_a2', 'lat_lowestmode_a3', 'lat_lowestmode_a4',\
+                        'lat_lowestmode_a5', 'lat_lowestmode_a6', 'lon_lowestmode_a1', 'lon_lowestmode_a10',\
+                        'lon_lowestmode_a2', 'lon_lowestmode_a3', 'lon_lowestmode_a4', 'lon_lowestmode_a5',\
+                        'lon_lowestmode_a6', 'sensitivity_a1', 'sensitivity_a10', 'sensitivity_a2', 'sensitivity_a3',\
+                        'sensitivity_a4', 'sensitivity_a5', 'sensitivity_a6', 'shot_number', 'stale_return_flag']
+
+    # ancillary
+    self.ancArrListL4A=['pft_lut', 'region_lut']
+
+    # model data
+    # this needs adding 'model_data'
+
+    # Fixed number of elements
+    self.strArrListL4A=['land_cover_data']
+
+    # agbd bits
+    self.agbdArrListL4A=['agbd_a1', 'agbd_a10', 'agbd_a2', 'agbd_a3', 'agbd_a4', 'agbd_a5',\
+                         'agbd_a6', 'agbd_pi_lower_a1', 'agbd_pi_lower_a10',\
+                         'agbd_pi_lower_a2', 'agbd_pi_lower_a3', 'agbd_pi_lower_a4',\
+                         'agbd_pi_lower_a5', 'agbd_pi_lower_a6', 'agbd_pi_upper_a1',\
+                         'agbd_pi_upper_a10', 'agbd_pi_upper_a2', 'agbd_pi_upper_a3',\
+                         'agbd_pi_upper_a4', 'agbd_pi_upper_a5', 'agbd_pi_upper_a6',\
+                         'agbd_se_a1', 'agbd_se_a10', 'agbd_se_a2', 'agbd_se_a3',\
+                         'agbd_se_a4', 'agbd_se_a5', 'agbd_se_a6', 'agbd_t_a1',\
+                         'agbd_t_a10', 'agbd_t_a2', 'agbd_t_a3', 'agbd_t_a4', 'agbd_t_a5',\
+                         'agbd_t_a6', 'agbd_t_pi_lower_a1', 'agbd_t_pi_lower_a10',\
+                         'agbd_t_pi_lower_a2', 'agbd_t_pi_lower_a3', 'agbd_t_pi_lower_a4',\
+                         'agbd_t_pi_lower_a5', 'agbd_t_pi_lower_a6', 'agbd_t_pi_upper_a1',\
+                         'agbd_t_pi_upper_a10', 'agbd_t_pi_upper_a2', 'agbd_t_pi_upper_a3',\
+                         'agbd_t_pi_upper_a4', 'agbd_t_pi_upper_a5', 'agbd_t_pi_upper_a6',\
+                         'agbd_t_se_a1', 'agbd_t_se_a10', 'agbd_t_se_a2', 'agbd_t_se_a3',\
+                         'agbd_t_se_a4', 'agbd_t_se_a5', 'agbd_t_se_a6',\
+                         'algorithm_run_flag_a1', 'algorithm_run_flag_a10',\
+                         'algorithm_run_flag_a2', 'algorithm_run_flag_a3',\
+                         'algorithm_run_flag_a4', 'algorithm_run_flag_a5',\
+                         'algorithm_run_flag_a6', 'l2_quality_flag_a1',\
+                         'l2_quality_flag_a10', 'l2_quality_flag_a2', 'l2_quality_flag_a3',\
+                         'l2_quality_flag_a4', 'l2_quality_flag_a5', 'l2_quality_flag_a6',\
+                         'l4_quality_flag_a1', 'l4_quality_flag_a10', 'l4_quality_flag_a2',\
+                         'l4_quality_flag_a3', 'l4_quality_flag_a4', 'l4_quality_flag_a5',\
+                         'l4_quality_flag_a6', 'predictor_limit_flag_a1',\
+                         'predictor_limit_flag_a10', 'predictor_limit_flag_a2',\
+                         'predictor_limit_flag_a3', 'predictor_limit_flag_a4',\
+                         'predictor_limit_flag_a5', 'predictor_limit_flag_a6',\
+                         'response_limit_flag_a1', 'response_limit_flag_a10',\
+                         'response_limit_flag_a2', 'response_limit_flag_a3',\
+                         'response_limit_flag_a4', 'response_limit_flag_a5',\
+                         'response_limit_flag_a6', 'selected_mode_a1', 'selected_mode_a10',\
+                         'selected_mode_a2', 'selected_mode_a3', 'selected_mode_a4',\
+                         'selected_mode_a5', 'selected_mode_a6', 'selected_mode_flag_a1',\
+                         'selected_mode_flag_a10', 'selected_mode_flag_a2',\
+                         'selected_mode_flag_a3', 'selected_mode_flag_a4',\
+                         'selected_mode_flag_a5', 'selected_mode_flag_a6', 'shot_number',\
+                         'xvar_a1', 'xvar_a10', 'xvar_a2', 'xvar_a3', 'xvar_a4', 'xvar_a5',\
+                         'xvar_a6']
+
 
     return
 
