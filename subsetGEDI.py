@@ -90,6 +90,8 @@ class gediData(object):
   def subsetL4A(self,f,outFile,b,minX,maxX,minY,maxY):
     '''Subset an L4A beam'''
 
+    print('For now this script does not include the model_data information in the subset file')
+
     # read the coords and determine output
     allLat=np.array(f[b]['lat_lowestmode'])
     allLon=np.array(f[b]['lon_lowestmode'])
@@ -105,7 +107,6 @@ class gediData(object):
 
     # loop over all arrays per shot
     for d in self.shotArrListL4A:
-      print(d)
       # read array
       jimlad=np.array(f[b][d])[useInd]
       # write subset to a new file
@@ -113,7 +114,6 @@ class gediData(object):
 
     # string fixed array lengths
     for d in self.strArrListL4A:
-      print(d)
       jimlad=np.array(f[b][d])
       # find maximum length
       maxLen=0
@@ -127,7 +127,6 @@ class gediData(object):
     g='geolocation'
     outFile[b].create_group(g)
     for d in self.geoArrListL4A:
-      print(d)
       if(d!='surface_type'):
         jimlad=np.array(f[b][g][d])[useInd]
         outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
@@ -140,7 +139,6 @@ class gediData(object):
       g='ANCILLARY'
       outFile.create_group(g)
       for d in self.ancArrListL4A:
-        print(d)
         jimlad=np.array(f[g][d])
         outFile[g].create_dataset(d,data=jimlad,compression='gzip')
       self.doneAnc=True
@@ -149,7 +147,6 @@ class gediData(object):
     g='agbd_prediction'
     outFile[b].create_group(g)
     for d in self.agbdArrListL4A:
-      print(d)
       jimlad=np.array(f[b][g][d])
       outFile[b][g].create_dataset(d,data=jimlad,compression='gzip')
 
