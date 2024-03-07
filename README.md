@@ -427,7 +427,7 @@ If the full grid is used, it outputs an ASCII file with the correlation for each
 
 The following example is currently the most efficient for finding the offset between GEDI and ALS data and outputting simulations of GEDI from the ALS aligned with GEDI.
 
-    collocateWaves -listALS alsList.txt -gedi waveforms.h5 -readHDFgedi -aEPSG 32622 -solveSofG -geoError 30 5 -fixFsig -writeWaves simulated.h5 -minDense 3 -minSense 0.9
+    collocateWaves -listALS alsList.txt -gedi waveforms.h5 -readHDFgedi -aEPSG 32622 -solveCofG -geoError 30 5 -fixFsig -writeWaves simulated.h5 -minDense 3 -minSense 0.9
 
 
 Where ``alsList.txt'' is a list of ALS filenames with absolute path, wavefroms.h5 is the GEDI L1B or simulated file, ``32622'' is the EPSG code of the ALS data and ``simulated.h5'' is the simulated waveforms output filename. This will only use ALS data with at least 3 beams per square metre and only use GEDI waveforms with at least 90% beam sensitivity.
