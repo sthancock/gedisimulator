@@ -3115,6 +3115,13 @@ void setGediGrid(gediIOstruct *gediIO,gediRatStruct *gediRat)
   }/*footprint width setting*/
 
   if(gediRat->doGrid){  /*it is a grid*/
+    /*check that bounds are sensible*/
+    if((gediRat->gMaxX<gediRat->gMinX)||(gediRat->gMaxY<gediRat->gMinY)){
+     fprintf(stderr,"A max bound is smaller than a min bound. Correct the bounds before running.\n");
+     fprintf(stderr,"minX %.2f maxX %.2f minY %.2f maxY %.2f\n",gediRat->gMinX,gediRat->gMaxX,gediRat->gMinY,gediRat->gMaxY);
+     exit(1);
+    }
+
     /*number of footprints*/
     gediRat->gNx=(int)((gediRat->gMaxX-gediRat->gMinX)/gediRat->gRes+1);
     gediRat->gNy=(int)((gediRat->gMaxY-gediRat->gMinY)/gediRat->gRes+1);
