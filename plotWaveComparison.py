@@ -19,7 +19,7 @@ if __name__ == '__main__':
     '''
     Read commandline arguments
     '''
-    p = argparse.ArgumentParser(description=("Draws comparosons of GEDI and simulated waveforms"))
+    p = argparse.ArgumentParser(description=("Draws comparisons of GEDI and simulated waveforms. NOTE that the waves should be aligned with collocateWaves first."))
     p.add_argument("--simWave",dest="simWave",type=str,help=("Input simulated HDF5 filename"))
     p.add_argument("--gediWave",dest="gediWave",type=str,help=("Input GEDI HDF5 filename"))
     p.add_argument("--outRoot",dest="outRoot",type=str,default='test',help=("Output graph filename root"))
