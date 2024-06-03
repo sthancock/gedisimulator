@@ -181,7 +181,7 @@ Where ``alsList.txt'' is an ASCII file containing a list of absolute filenames (
 
 ##### Lidar characteristics. Defaults are expected GEDI values.
     -pSigma sig;     set Gaussian pulse width as 1 sigma
-    -pFWHM fhwm;     set Gaussian pulse width as FWHM in ns
+    -pFWHM fhwm;     set Gaussian pulse width as FWHM in ns. This is the outgoing laser pulse, which will be twice the detected pulse width
     -readPulse file; read pulse shape and width from a file instead of making Gaussian
     -fSigma sig;     set footprint width
     -wavefront file; read wavefront shape from file instead of setting Gaussian. Note that footprint width is still set by fSigma
