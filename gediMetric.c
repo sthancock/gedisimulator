@@ -252,6 +252,7 @@ typedef struct{
 int main(int argc,char **argv)
 {
   int i=0;
+  uint64_t deconWavePlace=0;
   control *dimage=NULL;
   control *readCommands(int,char **);
   dataStruct *data=NULL;
@@ -268,6 +269,7 @@ int main(int argc,char **argv)
   void calculateSNR(control *,dataStruct *,int);
   void tidySNR(control *);
   void writeSNR(char *o,snrStruct *);
+  void writeDeconHDF(control *);
   float *processed=NULL,*denoised=NULL,*pclWave=NULL;
 
   /*read command Line*/
@@ -358,9 +360,8 @@ int main(int argc,char **argv)
 
             /*save deconvolved waveform if needed*/
             if(dimage->writeDecon){
-              fprintf(stdout,"Here\n");
-              memcpy(&dimage->hdfGedi->wave[0][i*data->nBins],denoised,data->nBins*sizeof(float));
-              fprintf(stdout,"Here\n");
+              memcpy(&dimage->hdfGedi->wave[0][deconWavePlace],denoised,data->nBins*sizeof(float));
+              deconWavePlace+=data->nBins;
             }
 
           }else{  /*ICESat-2 mode*/
@@ -375,7 +376,7 @@ int main(int argc,char **argv)
     }/*is the data usable*/
 
     /*write denoised waveforms if needed*/
-    if(dimage->writeDecon)writeGEDIl1b(dimage->hdfGedi,sprintf("%s.denoised.h5",dimage->outRoot),&(dimage->gediIO));
+    if(dimage->writeDecon)writeDeconHDF(dimage);
 
     /*tidy as we go along*/
     TIDY(processed);
@@ -487,6 +488,20 @@ int main(int argc,char **argv)
   }
   return(0);
 }/*main*/
+
+
+/*####################################################*/
+/*write a deconvolved HDF file*/
+
+void writeDeconHDF(control *dimage)
+{
+  char namen[200];
+
+  sprintf(namen,"%s.denoised.h5",dimage->outRoot);
+  writeGEDIl1b(dimage->hdfGedi,namen,&(dimage->gediIO));
+
+  return;
+}/*writeDeconHDF*/
 
 
 /*####################################################*/
