@@ -135,6 +135,7 @@ typedef struct{
 
   /*switches*/
   char writeFit;    /*write fitted wave switch*/
+  char writeDecon;  /*write deconvolved results in L1B format*/
   float rhRes;      /*rh resolution*/
   char bayesGround; /*Bayseian ground finding*/
   char noRHgauss;   /*do not do Gaussian fitting*/
@@ -274,7 +275,7 @@ int main(int argc,char **argv)
 
   /*set link noise and periodic noise phase if needed*/
   dimage->noise.linkSig=setNoiseSigma(&dimage->noise,dimage->gediIO.linkPsig,dimage->gediIO.linkFsig,rhoC,rhoG);
- 
+
   /*set photon rates if needed*/
   #ifdef USEPHOTON
   if(dimage->ice2||dimage->gediIO.pclPhoton)setPhotonRates(&dimage->photonCount);
@@ -355,6 +356,13 @@ int main(int argc,char **argv)
             if(dimage->readBinLVIS||dimage->readHDFlvis||dimage->readHDFgedi)writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[0]);
             else                                                             writeResults(data,dimage,metric,i,denoised,processed,dimage->gediIO.inList[i]);
 
+            /*save deconvolved waveform if needed*/
+            if(dimage->writeDecon){
+              fprintf(stdout,"Here\n");
+              memcpy(&dimage->hdfGedi->wave[0][i*data->nBins],denoised,data->nBins*sizeof(float));
+              fprintf(stdout,"Here\n");
+            }
+
           }else{  /*ICESat-2 mode*/
             photonCountCloud(denoised,data,&dimage->photonCount,dimage->outRoot,i,dimage->gediIO.den,&dimage->noise);
           }/*operation mode switch*/
@@ -365,6 +373,9 @@ int main(int argc,char **argv)
         calculateSNR(dimage,data,i);
       }/*metrics or SNR if*/
     }/*is the data usable*/
+
+    /*write denoised waveforms if needed*/
+    if(dimage->writeDecon)writeGEDIl1b(dimage->hdfGedi,sprintf("%s.denoised.h5",dimage->outRoot),&(dimage->gediIO));
 
     /*tidy as we go along*/
     TIDY(processed);
@@ -403,6 +414,7 @@ int main(int argc,char **argv)
   /*TIDY LVIS data if it was read*/
   if(dimage->readBinLVIS)TIDY(dimage->lvis.data);
   if(dimage->readHDFgedi)dimage->hdfGedi=tidyGediHDF(dimage->hdfGedi);
+
 
   /*write results if needed*/
   if(dimage->writeGauss)fprintf(stdout,"Written to %s.gauss.txt\n",dimage->outRoot);
@@ -2272,6 +2284,7 @@ control *readCommands(int argc,char **argv)
   /*switches*/
   dimage->noCanopy=0;        /*do output the FHD and canopy profiles*/
   dimage->writeFit=0;
+  dimage->writeDecon=0;
   dimage->gediIO.ground=0;
   dimage->gediIO.useInt=0;
   dimage->gediIO.useCount=1;
@@ -2410,6 +2423,8 @@ control *readCommands(int argc,char **argv)
         strcpy(dimage->l2namen,argv[++i]);
       }else if(!strncasecmp(argv[i],"-writeFit",9)){
         dimage->writeFit=1;
+      }else if(!strncasecmp(argv[i],"-writeDecon",11)){
+        dimage->writeDecon=1;
       }else if(!strncasecmp(argv[i],"-writeGauss",11)){
         dimage->writeGauss=1;
       }else if(!strncasecmp(argv[i],"-dcBias",7)){
@@ -2691,6 +2706,7 @@ void writeHelp()
 -inList list;     input file list for multiple files\n\
 -writeFit;        write fitted waveform\n\
 -writeGauss;      write Gaussian parameters\n\
+-writeDecon;      write denoised and deconvolved waveform in L1B format\n\
 -readBinLVIS;     input is an LVIS binary file\n\
 -readHDFlvis;     read LVIS HDF5 input\n\
 -readHDFgedi;     read GEDI simulator HDF5 input\n\
