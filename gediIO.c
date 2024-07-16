@@ -443,8 +443,6 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   TXstruct tx;          /*to hold pulse information for TX*/
   void rearrangePulsetoTX(gediIOstruct *,gediHDF *,TXstruct *);
 
-fprintf(stdout,"Here\n");
-
   /*open new file*/
   file=H5Fcreate(namen,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
 

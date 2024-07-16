@@ -497,6 +497,10 @@ void writeDeconHDF(control *dimage)
 {
   char namen[200];
 
+  if(dimage->gediIO.pulse)fprintf(stdout,"We have pulse\n");
+  else                    fprintf(stdout,"No pulse %d\n",dimage->hdfGedi->nPbins);
+
+
   sprintf(namen,"%s.denoised.h5",dimage->outRoot);
   writeGEDIl1b(dimage->hdfGedi,namen,&(dimage->gediIO));
 
@@ -722,8 +726,6 @@ float snrBeamSense(float falsePosThresh,float falseNegThresh,float gWidth,float 
   }else{
     bSense=0.0;
   }
-
-  /*fprintf(stdout,"%f %f %f %f %f %f\n",A,totN,gWidth,bSense,meanNoise,gInt);*/
 
   return(bSense);
 }/*snrBeamSense*/
