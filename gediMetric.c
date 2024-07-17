@@ -375,9 +375,6 @@ int main(int argc,char **argv)
       }/*metrics or SNR if*/
     }/*is the data usable*/
 
-    /*write denoised waveforms if needed*/
-    if(dimage->writeDecon)writeDeconHDF(dimage);
-
     /*tidy as we go along*/
     TIDY(processed);
     TIDY(denoised);
@@ -411,6 +408,9 @@ int main(int argc,char **argv)
     //TIDY(metric->LmomInf);
     //TIDY(metric->LmomMax);
   }/*file loop*/
+
+  /*write denoised waveforms if needed*/
+  if(dimage->writeDecon)writeDeconHDF(dimage);
 
   /*TIDY LVIS data if it was read*/
   if(dimage->readBinLVIS)TIDY(dimage->lvis.data);
@@ -495,14 +495,20 @@ int main(int argc,char **argv)
 
 void writeDeconHDF(control *dimage)
 {
+  int i=0;
   char namen[200];
 
-  if(dimage->gediIO.pulse)fprintf(stdout,"We have pulse\n");
-  else                    fprintf(stdout,"No pulse %d\n",dimage->hdfGedi->nPbins);
+  /*allocate the missing pieces*/
+  dimage->hdfGedi->beamDense=falloc(dimage->hdfGedi->nWaves,"dummy beam density",0);
+  dimage->hdfGedi->pointDense=falloc(dimage->hdfGedi->nWaves,"dummy beam density",0);
 
+  for(i=0;i<dimage->hdfGedi->nWaves;i++){
+    dimage->hdfGedi->beamDense[i]=0.0;
+    dimage->hdfGedi->pointDense[i]=0.0;
+  }
 
   sprintf(namen,"%s.denoised.h5",dimage->outRoot);
-  writeGEDIl1b(dimage->hdfGedi,namen,&(dimage->gediIO));
+  writeGEDIhdf(dimage->hdfGedi,namen,&(dimage->gediIO));
 
   return;
 }/*writeDeconHDF*/
