@@ -2729,7 +2729,7 @@ void writeHelp()
 -inList list;     input file list for multiple files\n\
 -writeFit;        write fitted waveform\n\
 -writeGauss;      write Gaussian parameters\n\
--writeDecon;      write denoised and deconvolved waveform in L1B format\n\
+-writeDecon;      write denoised and deconvolved waveform in simulated GEDI HDF5 format\n\
 -readBinLVIS;     input is an LVIS binary file\n\
 -readHDFlvis;     read LVIS HDF5 input\n\
 -readHDFgedi;     read GEDI simulator HDF5 input\n\
