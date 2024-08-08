@@ -406,13 +406,13 @@ void trimDataLength(dataStruct **data,gediHDF *hdfData,gediIOstruct *gediIO)
 
 void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
 {
-  int i=0;
+  int i=0,totBins=0;
   uint8_t *tempUint8=NULL;
   uint8_t *padUint8zeros(int);
   uint8_t *padUint8ones(int);
   uint16_t *tempUint16=NULL;
   uint16_t *padUint16zeros(int);
-  uint16_t *setRxSampleCount(int *,int);
+  uint16_t *setRxSampleCount(int *,int,int *);
   uint16_t *setSelectStretchL1B(int);
   uint16_t *setThUsedL1B(int);
   uint32_t *tempUint32=NULL;
@@ -492,15 +492,15 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   tempUint32=padUint32zeros(hdfData->nWaves);
   writeComp1dUint32HDF5(group_id,"rx_open",tempUint32,hdfData->nWaves);
   TIDY(tempUint32);
-  tempUint16=setRxSampleCount(hdfData->nBins,hdfData->nWaves);
+  tempUint16=setRxSampleCount(hdfData->nBins,hdfData->nWaves,&totBins);
   writeComp1dUint16HDF5(group_id,"rx_sample_count",tempUint16,hdfData->nWaves);
   TIDY(tempUint16);
   tempUint64=setRXstarts(hdfData->nWaves,hdfData->nBins);
   writeComp1dUint64HDF5(group_id,"rx_sample_start_index",tempUint64,hdfData->nWaves);
   TIDY(tempUint64);
   if(gediIO->useCount){
-    writeComp1dFloatHDF5(group_id,"rxwaveform",hdfData->wave[(int)gediIO->useInt],hdfData->nWaves*hdfData->nBins[0]);
-    if(hdfData->ground)writeComp1dFloatHDF5(group_id,"grxwaveform",hdfData->ground[(int)gediIO->useInt],hdfData->nWaves*hdfData->nBins[0]);
+    writeComp1dFloatHDF5(group_id,"rxwaveform",hdfData->wave[(int)gediIO->useInt],totBins);
+    if(hdfData->ground)writeComp1dFloatHDF5(group_id,"grxwaveform",hdfData->ground[(int)gediIO->useInt],totBins);
   }else{
     fprintf(stderr,"Issues with HDF5 format and not using the count method\n");
     exit(1);
@@ -887,7 +887,7 @@ double *setL1Bcoords(int aEPSG,gediHDF *hdfData)
   }
 
   /*does it need reprojecting?*/
-  if(aEPSG!=4326){
+  if((aEPSG!=4326)&&(aEPSG!=0)){
     /*make dummy z array*/
     z=dalloc(hdfData->nWaves,"Z setL1Bcoords",0);
 
@@ -1206,14 +1206,18 @@ uint64_t *setShotNumber(int nWaves)
 uint64_t *setRXstarts(int nWaves,int *nBins)
 {
   int i=0;
-  uint64_t *tempUint64=NULL;
+  uint64_t *tempUint64=NULL,s=0;
 
   if(!(tempUint64=(uint64_t *)calloc(nWaves,sizeof(uint64_t)))){
     fprintf(stderr,"error in tempUint64 allocation.\n");
     exit(1);
   }
 
-  for(i=0;i<nWaves;i++)tempUint64[i]=(uint64_t)i*(uint64_t)nBins[0];
+  s=0;
+  for(i=0;i<nWaves;i++){
+    tempUint64[i]=s;
+    s+=(uint64_t)nBins[i];
+  }
 
   return(tempUint64);
 }/*setRXstarts*/
@@ -1222,7 +1226,7 @@ uint64_t *setRXstarts(int nWaves,int *nBins)
 /*####################################################*/
 /*get Rx Sample Count in to L1B format*/
 
-uint16_t *setRxSampleCount(int *nBins,int nWaves)
+uint16_t *setRxSampleCount(int *nBins,int nWaves,int *totBins)
 {
   int i=0;
   uint16_t *tempUint16=NULL;
@@ -1232,7 +1236,10 @@ uint16_t *setRxSampleCount(int *nBins,int nWaves)
     exit(1);
   }
 
-  for(i=0;i<nWaves;i++)tempUint16[i]=(uint16_t)nBins[0];
+  for(i=0;i<nWaves;i++){
+    tempUint16[i]=(uint16_t)nBins[i];
+    *totBins+=nBins[i];
+  }
 
   return(tempUint16);
 }/*setRxSampleCount*/
@@ -2436,9 +2443,9 @@ dataStruct *unpackHDFgedi(char *namen,gediIOstruct *gediIO,gediHDF **hdfGedi,int
         }
       }
     }
-  }else if(hdfGedi[0]->nPbins==0){
+  }/*else if(hdfGedi[0]->nPbins==0){
     gediIO->pulse=NULL;
-  }/*pulse reading*/
+  }*//*pulse reading*/
 
   /*count energy*/
   data->totE=falloc((uint64_t)data->nWaveTypes,"totE",0);

@@ -360,8 +360,8 @@ int main(int argc,char **argv)
 
             /*save deconvolved waveform if needed*/
             if(dimage->writeDecon){
-              memcpy(&dimage->hdfGedi->wave[0][deconWavePlace],denoised,data->nBins*sizeof(float));
-              deconWavePlace+=data->nBins;
+              memcpy(&dimage->hdfGedi->wave[0][deconWavePlace],denoised,dimage->hdfGedi->nBins[i]*sizeof(float));
+              deconWavePlace+=dimage->hdfGedi->nBins[i];
             }
 
           }else{  /*ICESat-2 mode*/
@@ -508,7 +508,8 @@ void writeDeconHDF(control *dimage)
   }
 
   sprintf(namen,"%s.denoised.h5",dimage->outRoot);
-  writeGEDIhdf(dimage->hdfGedi,namen,&(dimage->gediIO));
+  //writeGEDIhdf(dimage->hdfGedi,namen,&(dimage->gediIO));
+  writeGEDIl1b(dimage->hdfGedi,namen,&(dimage->gediIO));
 
   return;
 }/*writeDeconHDF*/
