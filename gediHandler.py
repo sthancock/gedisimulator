@@ -115,12 +115,11 @@ class gediData(object):
       wave=np.full((nWaves,self.nBins),np.median(jimlad),dtype=np.float32)
       lastInd=0
       for i in range(0,startInds.shape[0]):
-        if(self.nBins<lenInds[i]):
-          minBin=self.nBins
-        else:
-          minBin=lenInds[i]
-        wave[i][0:minBin]=jimlad[startInds[i]:startInds[i]+minBin]
-        lastInd=lastInd+lenInds[i]
+        thisBins=int(lenInds[i])
+        if((startInds[i]+thisBins)>jimlad.shape[0]):
+          thisBins-=1
+        wave[i][0:thisBins]=jimlad[startInds[i]:int(startInds[i]+thisBins)]
+        lastInd=lastInd+thisBins
 
       # append all the arrays
       if(nWaves>0):
@@ -454,7 +453,7 @@ class gediData(object):
     # set defaults
     buff=0.0
     topBin=0
-    botBin=self.wave[i].shape[0]-1
+    botBin=self.lenInds[i]-1 #self.wave[i].shape[0]-1
 
     # are we denoising?
     if(thresh>0.0):
@@ -480,10 +479,11 @@ class gediData(object):
       # in case the search above has failed, use the whole bounds
       if(topBin<0):
         topBin=0
-      if(botBin>=self.z.shape[0]):
-        botBin=self.z.shape[0]-1
+      if(botBin>=self.lenInds[i]):
+        botBin=self.lenInds[i]-1
 
     return(self.z[botBin]-buff,self.z[topBin]+buff)
+
 
   ###########################################
 
