@@ -443,9 +443,6 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   TXstruct tx;          /*to hold pulse information for TX*/
   void rearrangePulsetoTX(gediIOstruct *,gediHDF *,TXstruct *);
 
-fprintf(stdout,"Writing L1B\n");
-fflush(stdout);
-
   /*open new file*/
   file=H5Fcreate(namen,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
 
@@ -1189,28 +1186,37 @@ int32_t *padInt32ones(int numb)
 
 uint64_t *setShotNumber(gediHDF *hdfData)
 {
-  int i=0;
-  char temp[100],beamID[10];
+  int i=0,j=0;
+  char temp[100],beamID[10],*waveID=NULL;
+  char *token=NULL;
   uint64_t *tempUint64=NULL;
-  uint64_t tempInt=0;
+
+  waveID=challoc(hdfData->idLength+1,"temporary waveID",0);
 
   if(!(tempUint64=(uint64_t *)calloc(hdfData->nWaves,sizeof(uint64_t)))){
     fprintf(stderr,"error in tempUint64 allocation.\n");
     exit(1);
   }
 
-  for(i=0;i<hdfData->nWaves;i++){
-    /*shot number and beam are saved in the waveID*/
-fprintf(stdout,"WaveID split: %s\n",hdfData->waveID[i]);
-fflush(stdout);
+  if(hdfData->waveID){
+    for(i=0;i<hdfData->nWaves;i++){
+      /*shot number and beam are saved in the waveID*/
+      memcpy(waveID,&(hdfData->waveID[i*hdfData->idLength]),hdfData->idLength);
 
-    if(sscanf(hdfData->waveID[i],"%s.%s.%lu",temp,beamID,&tempInt)!=3){
-      fprintf(stderr,"WaveID splitting error: %s\n",hdfData->waveID[i]);
-      exit(1);
+      /*decode the waveID*/
+      token=strtok(waveID,".");
+      j=0;
+      while(token){
+        token=strtok(NULL,".");
+        if(j==1)tempUint64[i]=(uint64_t)atoll(token);
+        j++;
+      }
     }
-    tempUint64[i]=tempInt; //(uint64_t)i;
+  }else{
+    for(i=0;i<hdfData->nWaves;i++)tempUint64[i]=(uint64_t)i;
   }
 
+  TIDY(waveID);
   return(tempUint64);
 }/*setShotNumber*/
 
