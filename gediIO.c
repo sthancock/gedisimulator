@@ -420,7 +420,7 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   uint32_t *setAllSamplesSumL1B(gediHDF *);
   uint64_t *tempUint64=NULL;
   uint64_t *setRXstarts(int,int *);
-  uint64_t *setShotNumber(int);
+  uint64_t *setShotNumber(gediHDF *);
   int8_t *tempInt8=NULL;
   int8_t *setSurfaceTypeL1B(int,int);
   int32_t *padInt32ones(int);
@@ -442,6 +442,9 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   herr_t status;
   TXstruct tx;          /*to hold pulse information for TX*/
   void rearrangePulsetoTX(gediIOstruct *,gediHDF *,TXstruct *);
+
+fprintf(stdout,"Writing L1B\n");
+fflush(stdout);
 
   /*open new file*/
   file=H5Fcreate(namen,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
@@ -509,7 +512,7 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   writeComp1dUint16HDF5(group_id,"selection_stretchers_x",tempUint16,hdfData->nWaves);
   writeComp1dUint16HDF5(group_id,"selection_stretchers_y",tempUint16,hdfData->nWaves);
   TIDY(tempUint16);
-  tempUint64=setShotNumber(hdfData->nWaves);
+  tempUint64=setShotNumber(hdfData);
   writeComp1dUint64HDF5(group_id,"shot_number",tempUint64,hdfData->nWaves);
   TIDY(tempUint64);
   tempUint8=padUint8zeros(hdfData->nWaves);
@@ -661,7 +664,7 @@ void writeGEDIl1b(gediHDF *hdfData,char *namen,gediIOstruct *gediIO)
   writeComp1dDoubleHDF5(sgID,"solar_azimuth",tempDouble,hdfData->nWaves);
   writeComp1dDoubleHDF5(sgID,"solar_elevation",tempDouble,hdfData->nWaves);
   TIDY(tempDouble);
-  tempUint64=setShotNumber(hdfData->nWaves);
+  tempUint64=setShotNumber(hdfData);
   tempDouble=dalloc(hdfData->nWaves,"shot_number",0);
   for(i=0;i<hdfData->nWaves;i++)tempDouble[i]=(double)tempUint64[i];
   writeComp1dDoubleHDF5(sgID,"shot_number",tempDouble,hdfData->nWaves);
@@ -1184,17 +1187,29 @@ int32_t *padInt32ones(int numb)
 /*####################################################*/
 /*set a shot number*/
 
-uint64_t *setShotNumber(int nWaves)
+uint64_t *setShotNumber(gediHDF *hdfData)
 {
   int i=0;
+  char temp[100],beamID[10];
   uint64_t *tempUint64=NULL;
+  uint64_t tempInt=0;
 
-  if(!(tempUint64=(uint64_t *)calloc(nWaves,sizeof(uint64_t)))){
+  if(!(tempUint64=(uint64_t *)calloc(hdfData->nWaves,sizeof(uint64_t)))){
     fprintf(stderr,"error in tempUint64 allocation.\n");
     exit(1);
   }
 
-  for(i=0;i<nWaves;i++)tempUint64[i]=(uint64_t)i;
+  for(i=0;i<hdfData->nWaves;i++){
+    /*shot number and beam are saved in the waveID*/
+fprintf(stdout,"WaveID split: %s\n",hdfData->waveID[i]);
+fflush(stdout);
+
+    if(sscanf(hdfData->waveID[i],"%s.%s.%lu",temp,beamID,&tempInt)!=3){
+      fprintf(stderr,"WaveID splitting error: %s\n",hdfData->waveID[i]);
+      exit(1);
+    }
+    tempUint64[i]=tempInt; //(uint64_t)i;
+  }
 
   return(tempUint64);
 }/*setShotNumber*/
