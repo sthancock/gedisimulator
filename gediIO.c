@@ -1969,7 +1969,7 @@ double *reprojectWaveBounds(double *inBounds,int inEPSG,int outEPSG)
     /*this will need updating once we hit version 10*/
     verMaj=findGDAlVerMaj();
 
-    if(verMaj>=3){  /*if GDAL >=v3, need to swap lat and lon*/
+    if((verMaj>=3)&&(inEPSG==4326)){  /*if GDAL >=v3, need to swap lat and lon*/
       bounds[0]=y[0];
       bounds[1]=x[0];
       bounds[2]=y[1];
