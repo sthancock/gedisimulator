@@ -965,14 +965,14 @@ void fullBullseyePlot(control *dimage,float **denoised,int nTypeWaves,dataStruct
 
 float **getCorrelStats(control *dimage,dataStruct **lvis,pCloudStruct **als,int *contN,double xOff,double yOff,double zOff,double **coords,float **denoised,int nTypeWaves,char leaveEmpty)
 {
-  int k=0;
-  float **correl=NULL;
+  int k=0,i=0;
+  float **correl=NULL,meanC=0;
   float ** filterOutliers(float **,int *,float,int);
   waveStruct *waves=NULL;
 
 
   /*progress report*/
-  if(globAnneal.dimage==NULL)fprintf(stdout,"Testing x %.2f y %.2f z %.2f fSig %.2f\n",xOff,yOff,zOff,dimage->simIO.fSigma);
+  if(globAnneal.dimage==NULL)fprintf(stdout,"Testing x %.2f y %.2f z %.2f fSig %.2f",xOff,yOff,zOff,dimage->simIO.fSigma);
 
   /*shift prints*/
   dimage->gediRat.coords=shiftPrints(coords,xOff,yOff,dimage->gediRat.gNx);
@@ -1016,6 +1016,14 @@ float **getCorrelStats(control *dimage,dataStruct **lvis,pCloudStruct **als,int 
 
   /*filter outliers if needed*/
   if(dimage->filtOutli)correl=filterOutliers(correl,contN,dimage->outStdev,nTypeWaves);
+
+  /*doa quick mean*/
+  meanC=0.0;
+  for(i=0;i<*contN;i++)meanC+=*correl[i];
+  meanC/=(float)(*contN);
+  if(globAnneal.dimage==NULL)fprintf(stdout," correl %.1f\%\n",meanC*100);
+
+
 
   return(correl);
 }/*getCorrelStats*/
