@@ -674,8 +674,8 @@ imageStruct *allocateImage(control *dimage)
   image->maxY=dimage->bounds[3];
 
   /*size of image*/
-  image->nX=(int)((image->maxX-image->minX)/(double)dimage->res)+1;
-  image->nY=(int)((image->maxY-image->minY)/(double)dimage->res)+1;
+  image->nX=(int)((image->maxX-image->minX)/(double)dimage->res+1);
+  image->nY=(int)((image->maxY-image->minY)/(double)dimage->res+1);
   fprintf(stdout,"Image will be %d by %d\n",image->nX,image->nY);
 
   /*allocate data arrays*/
