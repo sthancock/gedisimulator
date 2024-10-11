@@ -183,7 +183,7 @@ class gediData(object):
       if(temp.dtype!='int64'):
         waveID=[]
         for i in range(0,nWaves):
-          waveID.append(''.join(np.array(temp[i], dtype=np.str)))
+          waveID.append(''.join(np.array(temp[i], dtype=str)))
       else:
         waveID=temp
       # split out the shot number
@@ -453,7 +453,12 @@ class gediData(object):
     # set defaults
     buff=0.0
     topBin=0
-    botBin=self.lenInds[i]-1 #self.wave[i].shape[0]-1
+    if(self.real==1):
+      maxLen=self.lenInds[i]-1
+      botBin=maxLen
+    else:
+      maxLen=self.wave[i].shape[0]-1
+      botBin=maxLen
 
     # are we denoising?
     if(thresh>0.0):
@@ -479,8 +484,8 @@ class gediData(object):
       # in case the search above has failed, use the whole bounds
       if(topBin<0):
         topBin=0
-      if(botBin>=self.lenInds[i]):
-        botBin=self.lenInds[i]-1
+      if(botBin>maxLen):
+        botBin=maxLen
 
     return(self.z[botBin]-buff,self.z[topBin]+buff)
 
