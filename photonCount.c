@@ -892,7 +892,7 @@ int setNumberNoise(float cov,float noise_mult,float H)
     refl=cov*0.15+(1.0-cov)*0.22;*/  /*assuming ground and canopy reflectance values*/
 
     /*noise rate in photons per window*/
-    noiseRate=noise_mult*pow(10.0,6.0); //*refl     used to be *refl to account for xchanging surface reflectance
+    noiseRate=noise_mult*1000000.0; //*refl     used to be *refl to account for xchanging surface reflectance
     /*nNoise=(int)(50.0*(H/c)*noiseRate+0.5);  This is to match Kaitlin's matlab code, but unsure where the 50 came from*/
     tempPhot.designval=(H/c)*noiseRate;
 
@@ -901,7 +901,7 @@ int setNumberNoise(float cov,float noise_mult,float H)
     photThresh=(float)rand()/(float)RAND_MAX;
     nNoise=(int)pickArrayElement(photThresh,tempPhot.prob,tempPhot.pBins,1);
     TIDY(tempPhot.prob);
-  }else if(noise_mult<(-1.0*TOL)){  /*noise defined as mean number of photoins*/
+  }else if(noise_mult<(-1.0*TOL)){  /*noise defined as mean number of photons*/
     /*mean numb3er of photons*/
     tempPhot.designval=-1.0*noise_mult;   /*mean number of noise photons stored as a negative*/
     /*pick from a Poisson*/
