@@ -608,7 +608,7 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
   void knockOffNegativeWaves(float *,dataStruct *);
   void adjustTotalPhotRate(photonStruct *,float);
   void setPhotonGround(float *,float *,float,double,float *,float *,double *,int);
-  char testPhotonGround(dataStruct *,float);
+  char testPhotonGround(dataStruct *,float,float);
 
 
   /*remove negatives if needed*/
@@ -644,7 +644,7 @@ float **countPhotons(float *denoised,dataStruct *data,photonStruct *photonCount,
 
     phots[0][i]=(float)data->z[0]-d*data->res;   /*determine range*/
     phots[1][i]=1.0;                             /*is signal*/
-    phots[2][i]=(float)testPhotonGround(data,d); /*is this ground or canopy?*/
+    phots[2][i]=(float)testPhotonGround(data,d,photonCount->grThresh); /*is this ground or canopy?*/
   }/*signal photon loop*/
 
   /*Noise*/
@@ -732,7 +732,7 @@ void photonCountCloud(float *denoised,dataStruct *data,photonStruct *photonCount
 /*########################################################*/
 /*is this photon from the ground?*/
 
-char testPhotonGround(dataStruct *data,float d)
+char testPhotonGround(dataStruct *data,float d,float grThresh)
 {
   int bin=0;
   float gFrac=0;
@@ -743,7 +743,7 @@ char testPhotonGround(dataStruct *data,float d)
     bin=(int)d;
     if(data->wave[data->useType][bin]>0.0){
       gFrac=data->ground[data->useType][bin]/data->wave[data->useType][bin];
-      isGround=(gFrac>=0.1)?1:0;   /*for dense canopies a threshold of 50% causes issues*/
+      isGround=(gFrac>=grThresh)?1:0;   /*for dense canopies a threshold of 50% causes issues*/
     }else isGround=0;
   }
 

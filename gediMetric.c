@@ -2401,6 +2401,7 @@ control *readCommands(int argc,char **argv)
   dimage->photonCount.H=200.0;   /*this is thew two way distance, so a 100 m window, halved later*/
   dimage->photonCount.nPhotC=dimage->photonCount.nPhotG=-1.0;     /*blank number*/
   dimage->photonCount.reflDiff=0;      /*no reflectance difference*/
+  dimage->photonCount.grThresh=0.5;    /*if pseudo-wave has > 50% ground, is ground*/
   dimage->photonCount.noise_mult=0.0;
   dimage->photonCount.rhoVrhoG=1.0;
   dimage->photonCount.writeHDF=0;  /*write ASCII by default*/
@@ -2655,6 +2656,9 @@ control *readCommands(int argc,char **argv)
         dimage->ice2=1;
       }else if(!strncasecmp(argv[i],"-photonWave",11)){
         dimage->gediIO.photonWave=1;
+      }else if(!strncasecmp(argv[i],"-grThresh",9)){
+        checkArguments(1,i,argc,"-grThresh");
+        dimage->photonCount.grThresh=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-photonPCL",10)){
         dimage->gediIO.pclPhoton=1;        /*Pulse compression lidar with photon counting*/
       }else if(!strncasecmp(argv[i],"-pcl",4)){
@@ -2787,7 +2791,8 @@ void writeHelp()
 -noiseMult x;     noise multiplier for photon-counting. Noise photon rate in micro Hz\n\
 -nPhotC n;        mean number of canopy photons (replaces nPhotons and rhoVrhoG)\n\
 -nPhotG n;        mean number of ground photons (replaces nPhotons and rhoVrhoG)\n\
--photHDF;         write photon-counting output in HDF5\n");
+-photHDF;         write photon-counting output in HDF5\n\
+-grThresh t;      threshold to devide if photon is ground or canopy\n");
   #endif
   fprintf(stdout,"\nPulse-compressed lidar\n\
 -photonPCL;       convert to photon counting pulse-compressed before processing\n\
