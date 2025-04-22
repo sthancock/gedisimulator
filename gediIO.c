@@ -901,6 +901,9 @@ double *setL1Bcoords(int aEPSG,gediHDF *hdfData)
     OSRDestroySpatialReference(hSourceSRS);
     OSRDestroySpatialReference(hTargetSRS);
     TIDY(z);
+
+    /*need to add lat-lon swapping here*/
+
   }
 
   return(tempDouble);
