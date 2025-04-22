@@ -903,6 +903,7 @@ double *setL1Bcoords(int aEPSG,gediHDF *hdfData)
     TIDY(z);
 
     /*need to add lat-lon swapping here*/
+    /*potentially use a C version of srs.SetAxisMappingStrategy(osgeo.osr.OAMS_TRADITIONAL_GIS_ORDER)*/
 
   }
 
