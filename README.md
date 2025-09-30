@@ -231,6 +231,27 @@ Where ``alsList.txt'' is an ASCII file containing a list of absolute filenames (
 The **-ground** flag in gediRat uses the ALS ground classification to separate the contributions to the waveform into ground and canopy. This weighting between ground and canopy is then used in gediMetric to estimate the ALS derived canopy cover. Therefore, the tolerance used when classifying the ground points in the ALS data may affect the canopy cover estimate returned by gediMetric if too tight a tolerance is used. The ground classification tolerance should be enough to account for any topographic variations within a footprint as well as any ALS noise (particularly at the edge of flightlines). For operational use, gediRat is run on ALS data that has been classified with a 60 cm tolerance.
 
 
+###  Pulse shape
+
+GEDI has a slightly asymmetric pulse. This will shift RH metrics a little compared to a pure Gaussian. It can also move the vertical centre when aligning GEDI to ALS with **collocateWaves**. The files are in:
+
+    pulse_shapes
+
+And include a file for each of GEDI's beams. To include them in the simulation, use the **-readPulse** option. The pulse shape is saved in the output file and is available for gediMetric to read.
+
+The GEDI beams are:
+
+| Beam ID | Beam type |
+|---------|-----------|
+| BEAM0000 | Coverage beam  |
+| BEAM0001 | Coverage beam  |
+| BEAM0010 | Coverage beam  |
+| BEAM0011 | Coverage beam  |
+| BEAM0101 | Full power beam  |
+| BEAM0110 | Full power beam  |
+| BEAM1000 | Full power beam  |
+| BEAM1011 | Full power beam  |
+
 
 ## gediMetric ##
 
@@ -422,12 +443,14 @@ It requires the large-footprint system pulse shape (either a Gaussian width or a
 
 If the full grid is used, it outputs an ASCII file with the correlation for each x, y and z offset. If it uses a simplex it outputs the single optimum offset.
 
+It is recommended to use the pulse shapes provided with this repository (pulse\_shapes). The pulse shapes are similar enough that picking one for the whole dataset should not cause significant errors.
+
 
 #### Usage example
 
 The following example is currently the most efficient for finding the offset between GEDI and ALS data and outputting simulations of GEDI from the ALS aligned with GEDI.
 
-    collocateWaves -listALS alsList.txt -gedi waveforms.h5 -readHDFgedi -aEPSG 32622 -solveCofG -geoError 30 5 -fixFsig -writeWaves simulated.h5 -minDense 3 -minSense 0.9
+    collocateWaves -listALS alsList.txt -gedi waveforms.h5 -readHDFgedi -aEPSG 32622 -solveCofG -geoError 30 5 -fixFsig -writeWaves simulated.h5 -minDense 3 -minSense 0.9 -readPulse pulse_shapes/meanPulse.BEAM0101.txt
 
 
 Where ``alsList.txt'' is a list of ALS filenames with absolute path, wavefroms.h5 is the GEDI L1B or simulated file, ``32622'' is the EPSG code of the ALS data and ``simulated.h5'' is the simulated waveforms output filename. This will only use ALS data with at least 3 beams per square metre and only use GEDI waveforms with at least 90% beam sensitivity.
