@@ -183,6 +183,7 @@ Where ``alsList.txt'' is an ASCII file containing a list of absolute filenames (
     -pSigma sig;     set Gaussian pulse width as 1 sigma
     -pFWHM fhwm;     set Gaussian pulse width as FWHM in ns. This is the outgoing laser pulse, which will be twice the detected pulse width
     -readPulse file; read pulse shape and width from a file instead of making Gaussian
+    -pRes res;       force the pulse resolution. Otherwise it is equal to the waveform resolution
     -fSigma sig;     set footprint width
     -wavefront file; read wavefront shape from file instead of setting Gaussian. Note that footprint width is still set by fSigma
     -res res;        range resolution of waveform digitisation to output, in units of ALS data
