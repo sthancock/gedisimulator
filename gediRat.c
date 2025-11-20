@@ -529,6 +529,7 @@ control *readCommands(int argc,char **argv)
   int i=0;
   control *dimage=NULL;
   void writeGediRatHelpMessage();
+  char forcePres=0;   /*forse pulse resolution to be defined*/
 
   if(!(dimage=(control *)calloc(1,sizeof(control)))){
     fprintf(stderr,"error control allocation.\n");
@@ -673,6 +674,10 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-readPulse");
         dimage->gediIO.readPulse=1;
         strcpy(dimage->gediIO.pulseFile,argv[++i]);
+      }else if(!strncasecmp(argv[i],"-pRes",5)){
+        checkArguments(1,i,argc,"-pRes");
+        forcePres=1;
+        dimage->gediIO.pRes=atof(argv[++i]);;
       }else if(!strncasecmp(argv[i],"-pulseAfter",11)){
         dimage->gediRat.pulseAfter=1;
       }else if(!strncasecmp(argv[i],"-pulseBefore",12)){
@@ -759,7 +764,7 @@ control *readCommands(int argc,char **argv)
   dimage->gediIO.nTypeWaves=dimage->gediIO.useCount+dimage->gediIO.useFrac+dimage->gediIO.useInt;
 
   /*ensure pulse is sampled at same rate as waveform*/
-  if(dimage->gediIO.readPulse==0)dimage->gediIO.pRes=dimage->gediIO.res;
+  if((dimage->gediIO.readPulse==0)&&(!forcePres))dimage->gediIO.pRes=dimage->gediIO.res;
 
   return(dimage);
 }/*readCommands*/
