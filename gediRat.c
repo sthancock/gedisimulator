@@ -795,6 +795,7 @@ void writeGediRatHelpMessage()
 -pSigma sig;     set Gaussian pulse width as 1 sigma\n\
 -pFWHM fhwm;     set Gaussian pulse width as FWHM in ns. This is the outgoing laser pulse, which will be twice the detected pulse width\n\
 -readPulse file; read pulse shape and width from a file insteda of making Gaussian\n\
+-pRes res;       resolution to use for pulse array. Otherwise equal to range resolution\n\
 -fSigma sig;     set footprint width\n\
 -wavefront file; read wavefront shape from file instead of setting Gaussian. Note that footprint width is still set by fSigma\n\
 -res res;        range resolution of waveform digitisation to output, in units of ALS data\n\
