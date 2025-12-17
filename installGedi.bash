@@ -21,7 +21,9 @@ export CMPFIT_ROOT=$HOMDIR/src/cmpfit-1.2
 export GSL_ROOT=/usr/local/lib
 export LIBCLIDAR_ROOT=$HOMDIR/src/libclidar
 export HANCOCKTOOLS_ROOT=$HOMDIR/src/tools
-export HDF5_LIB=/apps/hdf5/1.8.15/patch1
+#export HDF5_LIB=/apps/hdf5/1.8.15/patch1
+export HDF5_LIB=/usr/lib/x86_64-linux-gnu/hdf5/serial    # this is for forth
+
 
 envFile="$HOMDIR/.bashrc"
 echo "export ARCH=`uname -m`" >> $envFile
