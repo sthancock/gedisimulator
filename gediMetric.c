@@ -2417,7 +2417,6 @@ control *readCommands(int argc,char **argv)
   /*others*/
   rhoG=0.4;                   /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
   rhoC=0.57;                  /*these are used only for estimating true cover. Assumed in Link Margin analysis so propagates through*/
-  dimage->rhoRatio=rhoC/rhoG; /*these are used only for estimating true cover*/
   dimage->scaleRhoVrhoG=1.0;  /*this is used to rescale the true waveform*/
   dimage->changeGrRho=0;      /*do not rescale the true waveform*/
   dimage->gTol=0.0;
@@ -2570,12 +2569,12 @@ control *readCommands(int argc,char **argv)
         dimage->noise.minGap=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-bayesGround",13)){
         dimage->bayesGround=1;
-      /*}else if(!strncasecmp(argv[i],"-rhoG",5)){
+      }else if(!strncasecmp(argv[i],"-rhoG",5)){
         checkArguments(1,i,argc,"-rhoG");
         rhoG=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-rhoC",5)){
         checkArguments(1,i,argc,"-rhoC");
-        rhoC=atof(argv[++i]);*/
+        rhoC=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-maxDN",6)){
         checkArguments(1,i,argc,"-maxDN");
         dimage->noise.maxDN=atof(argv[++i]);
@@ -2698,7 +2697,6 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-rhoVrhoG");
         dimage->scaleRhoVrhoG=atof(argv[++i]);
         dimage->changeGrRho=1;
-        dimage->rhoRatio=rhoC/(rhoG*dimage->scaleRhoVrhoG); /*this is used only for estimating true cover*/
       }else if(!strncasecmp(argv[i],"-nMessages",10)){
         checkArguments(1,i,argc,"-nMessages");
         dimage->gediIO.nMessages=atoi(argv[++i]);;
@@ -2718,6 +2716,9 @@ control *readCommands(int argc,char **argv)
     fprintf(stderr,"Noise option conflict. Cannot use missGround without ground\n");
     exit(1);
   }
+
+  /*scaling used only for estimating true cover*/
+  dimage->rhoRatio=rhoC/(rhoG*dimage->scaleRhoVrhoG);
 
   return(dimage);
 }/*readCommands*/
@@ -2763,6 +2764,8 @@ void writeHelp()
 -noCanopy;        do not calculate FHD histograms and LAI profiles\n\
 -noGroundRH;      do not include ground energy in RH metric calculation\n\
 -rhoVrhoG x;      ratio of canopy to ground reflectance at this wavelength for rescaling waveform. Note different from rhoV and rhoG\n\
+-rhoG rho;        ground reflectance for calculating true canopy cover\n\
+-rhoC rho;        canopy reflectance for calculating true canopy cover\n\
 \nAdding noise:\n\
 -dcBias n;        mean noise level\n\
 -nSig sig;        noise sigma\n\
@@ -2829,10 +2832,6 @@ void writeHelp()
 -deconIter n;     maximum number of deconvolution iterations\n\
 \nQuestions to svenhancock@gmail.com\n\n");
 
-/* I do not think these are used anymore?
--rhoG rho;        ground reflectance for calculating true canopy cover\n\
--rhoC rho;        canopy reflectance for calculating true canopy cover\n\
-*/
 
   return;
 }/*writeHelp*/
