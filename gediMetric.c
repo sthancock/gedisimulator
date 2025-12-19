@@ -2570,12 +2570,12 @@ control *readCommands(int argc,char **argv)
         dimage->noise.minGap=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-bayesGround",13)){
         dimage->bayesGround=1;
-      }else if(!strncasecmp(argv[i],"-rhoG",5)){
+      /*}else if(!strncasecmp(argv[i],"-rhoG",5)){
         checkArguments(1,i,argc,"-rhoG");
         rhoG=atof(argv[++i]);
       }else if(!strncasecmp(argv[i],"-rhoC",5)){
         checkArguments(1,i,argc,"-rhoC");
-        rhoC=atof(argv[++i]);
+        rhoC=atof(argv[++i]);*/
       }else if(!strncasecmp(argv[i],"-maxDN",6)){
         checkArguments(1,i,argc,"-maxDN");
         dimage->noise.maxDN=atof(argv[++i]);
@@ -2698,6 +2698,7 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-rhoVrhoG");
         dimage->scaleRhoVrhoG=atof(argv[++i]);
         dimage->changeGrRho=1;
+        dimage->rhoRatio=rhoC/(rhoG*dimage->scaleRhoVrhoG); /*this is used only for estimating true cover*/
       }else if(!strncasecmp(argv[i],"-nMessages",10)){
         checkArguments(1,i,argc,"-nMessages");
         dimage->gediIO.nMessages=atoi(argv[++i]);;
@@ -2822,13 +2823,16 @@ void writeHelp()
 -medNoise;        use median stats rather than mean\n\
 -varDrift;        correct detector drift with variable factor\n\
 -driftFac xi;     fix drift with constant drift factor\n\
--rhoG rho;        ground reflectance for calculating true canopy cover\n\
--rhoC rho;        canopy reflectance for calculating true canopy cover\n\
 -pSigma sig;      pulse width to smooth by if using Gaussian pulse\n\
 -gold;            deconvolve with Gold's method\n\
 -deconTol tol;    deconvolution tolerance\n\
 -deconIter n;     maximum number of deconvolution iterations\n\
 \nQuestions to svenhancock@gmail.com\n\n");
+
+/* I do not think these are used anymore?
+-rhoG rho;        ground reflectance for calculating true canopy cover\n\
+-rhoC rho;        canopy reflectance for calculating true canopy cover\n\
+*/
 
   return;
 }/*writeHelp*/
