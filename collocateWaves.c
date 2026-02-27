@@ -1472,7 +1472,6 @@ dataStruct **readMultiLVIS(control *dimage,float *res)
   bounds=reprojectWaveBounds(&(tempBound[0]),dimage->aEPSG,dimage->lEPSG);
 
   /*loop over lvis files*/
-  fprintf(stdout,"Gah %d %d\n",dimage->lvisIO.nFiles,dimage->useGediHDF);
   for(i=0;i<dimage->lvisIO.nFiles;i++){
     if(dimage->useLvisHDF){
       /*read HDF5*/
@@ -1485,13 +1484,10 @@ dataStruct **readMultiLVIS(control *dimage,float *res)
       /*unpack*/
       lvis=copyLVISlgw(dimage->lvisIO.inList[i],lvis,dimage,bounds);
     }else if(dimage->useGediHDF){
-      fprintf(stdout,"Here\n");
       /*read HDF*/
       simHDF=readGediHDF(dimage->lvisIO.inList[i],&dimage->lvisIO);
-      fprintf(stdout,"Read\n");
       /*unpack simulated HDF data*/
       lvis=copyGEDIhdf(simHDF,lvis,dimage,bounds);
-      fprintf(stdout,"Copied\n");
       /*tidy up*/
       simHDF=tidyGediHDF(simHDF);
     }
@@ -1601,13 +1597,11 @@ dataStruct **copyGEDIhdf(gediHDF *hdf,dataStruct **lvis,control *dimage,double *
   }
 
   /*count number within*/
-  fprintf(stdout,"nWaves %d\n",hdf->nWaves);
   nNew=0;
   for(i=0;i<hdf->nWaves;i++){
     x=hdf->lon[i];
     y=hdf->lat[i];
     if((x>=bounds[0])&&(y>=bounds[1])&&(x<=bounds[2])&&(y<=bounds[3]))nNew++;
-    fprintf(stdout,"gedi %f %f als %f %f\n",x,y,bounds[0],bounds[1]);
   }/*point loop*/
 
   /*allocate space*/
