@@ -7,6 +7,7 @@ This is a set of programs to simulate large-footprint full-waveform lidar from a
 [Hancock, S., Armston, J., Hofton, M., Sun, X., Tang, H., Duncanson, L.I., Kellner, J.R. and Dubayah, R., 2019. The GEDI simulator: A large‐footprint waveform lidar simulator for calibration and validation of spaceborne missions. Earth and Space Science.](https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2018EA000506)
 
 
+
 A google group has been set up for asking questions. It can be found [here](https://groups.google.com/g/gedisim).
 
 
