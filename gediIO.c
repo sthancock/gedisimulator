@@ -1922,7 +1922,7 @@ int *usableGEDIfootprints(double *tempLon,double *tempLat,int numb,int *nUse,ged
        (tempLat[i]>=bounds[1])&&(tempLat[i]<=bounds[3])){
       useInd=markInt(*nUse,useInd,i);
       (*nUse)++;
-    }
+    }else fprintf(stdout,"%f %f %f %f\n",tempLon[i],tempLat[i],bounds[0],bounds[1]);
   }
 
 
@@ -1972,6 +1972,7 @@ double *reprojectWaveBounds(double *inBounds,int inEPSG,int outEPSG)
     /*GDAL 3.0 and later now returns lat lon rather than lon lat. Find majer version*/
     /*this will need updating once we hit version 10*/
     verMaj=findGDAlVerMaj();
+    fprintf(stdout,"verMaj now %f\n",verMaj);
 
     if((verMaj>=3)&&(inEPSG==4326)){  /*if GDAL >=v3, need to swap lat and lon*/
       bounds[0]=y[0];
@@ -2010,6 +2011,9 @@ int findGDAlVerMaj()
   strcpy(&(vers[0]),GDALVersionInfo("VERSION_NUM"));
   val=atof(vers);
   verMaj=(int)(val/pow(10,(int)(log(val)/log(10.0))));
+  fprintf(stdout,"%s\n",GDALVersionInfo("VERSION_NUM"));
+  //verMaj=atof(vers[0]);
+  fprintf(stdout,"%s\n",&(vers[0]));
 
   return(verMaj);
 }/*findGDAlVerMaj*/
