@@ -71,12 +71,25 @@ class gediData(object):
     self.beamList=['BEAM0000', 'BEAM0001', 'BEAM0010', 'BEAM0011', 'BEAM0101', 'BEAM0110', 'BEAM1000', 'BEAM1011']
     self.nWaves=0
 
+    # first, find max number of bins across all beams, in order to allocate array
+    self.maxBins=0
+    for b in self.beamList:
+      if((b in list(f))==False): # does this exist?
+        continue                 # if not, skip it
+      elif(('geolocation' in list(f[b]))==False):  # no data in beam
+        continue
+      lenInds=np.array(f[b]['rx_sample_count'])
+      if(lenInds.max()>self.maxBins):
+        self.maxBins=lenInds.max()
+
+
+
     # loop over beams
     for b in self.beamList:
       print(b)
       if((b in list(f))==False): # does this exist?
         continue                 # if not, skip it
-      elif(('geolocation' in list(f[b]))==False):  # no data in bea,
+      elif(('geolocation' in list(f[b]))==False):  # no data in beam
         continue
 
       # read the coords and determine output
@@ -112,7 +125,7 @@ class gediData(object):
       # read raw data and repack
       nWaves=len(useInd)
       jimlad=np.array(f[b]['rxwaveform'])
-      wave=np.full((nWaves,self.nBins),np.median(jimlad),dtype=np.float32)
+      wave=np.full((nWaves,self.maxBins),np.median(jimlad),dtype=np.float32)
       lastInd=0
       for i in range(0,startInds.shape[0]):
         thisBins=int(lenInds[i])
@@ -486,6 +499,11 @@ class gediData(object):
         topBin=0
       if(botBin>maxLen):
         botBin=maxLen
+
+    if(botBin<0):
+      botBin=0
+    if(topBin>=self.z.shape[0]):
+      topBin=self.z.shape[0]-1
 
     return(self.z[botBin]-buff,self.z[topBin]+buff)
 
