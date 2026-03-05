@@ -50,16 +50,14 @@ if [ ! -e $HOMDIR/bin/csh ];then
   mkdir $HOMDIR/bin/csh
 fi
 
-pushd $HOMDIR/src
-wget https://www.physics.wisc.edu/~craigm/idl/down/cmpfit-1.2.tar.gz
-tar -xvf cmpfit-1.2.tar.gz
-popd
 
 pushd $HOMDIR/src
 git clone https://bitbucket.org/StevenHancock/libclidar
 git clone https://bitbucket.org/StevenHancock/tools
 git clone https://bitbucket.org/StevenHancock/gedisimulator
 
+cp gedisimulator/packages/cmpfit-1.2.tar.gz ./
+tar -xvf cmpfit-1.2.tar.gz
 
 programList="gediRat gediMetric mapLidar collocateWaves lasPoints fitTXpulse"
 cd $GEDIRAT_ROOT/
@@ -75,8 +73,8 @@ for program in $cshList;do
   cp $program $HOME/bin/csh/
 done
 
-#cp *.csh $HOMDIR/src/csh/
-#cp *.bash $HOMDIR/src/csh/
+cp *.csh $HOMDIR/bin/csh/
+cp *.bash $HOMDIR/bin/csh/
 
 popd
 
