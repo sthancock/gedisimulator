@@ -2089,7 +2089,7 @@ control *readCommands(int argc,char **argv)
         checkArguments(1,i,argc,"-readBeams");
         setBeamsToRead(&(dimage->lvisIO.useBeam[0]),argv[++i]);
       }else if(!strncasecmp(argv[i],"-help",5)){
-        fprintf(stdout,"\n#####\nProgram to colocate large-footprint and small-footprint lidar data\n#####\n\
+        fprintf(stdout,"\n#####\nProgram to collocate large-footprint and small-footprint lidar data\n#####\n\
 \n# Input-output\n\
 -output name;     output filename\n\
 -listAls list;    input file list for multiple als files\n\
@@ -2117,7 +2117,7 @@ control *readCommands(int argc,char **argv)
 -simplex;         use simplex optimisation rather than doing the full bullseye plot\n\
 -anneal;          use simulated annealing optimisation\n\
 -fixFsig;         fix fSigma in simplex\n\
--geoError expError correlDist;   rapid geolocation, using expected geolocation error and correlation distance. Vertical shifts must be separatley defined\n\
+-geoError expError correlDist;   rapid geolocation, using expected geolocation error and correlation distance. Vertical shifts must be separately defined\n\
 -quickGeo;        perform rapid geolocation using default error values\n\
 -optTol x;        tolerance for optimisation\n\
 -maxIter n;       maximum number of iterations\n\
@@ -2148,8 +2148,8 @@ control *readCommands(int argc,char **argv)
 -checkCover;      only include footprints that are at least 2/3 covered with ALS data\n\
 -median;          use median correlation rather than mean\n\
 \n# Simulator settings. For simulator validation only\n\
--noNorm;          don't correct sims for ALS densiy variations\n\
--norm;            correct sims for ALS densiy variations\n\
+-noNorm;          don't correct sims for ALS density variations\n\
+-norm;            correct sims for ALS density variations\n\
 -allSimMeth;      use all simulation methods\n\
 -pulseBefore;     apply pulse shape before binning to prevent aliasing\n\
 \n# Octree to speed searching of ALS data. Not fully operational\n\
