@@ -1,6 +1,7 @@
 
 '''
-Script to access simuated GEDI data
+Script to subset GEDI data
+Works on L2A, L2B and L4A files
 '''
 
 ##################################
@@ -15,7 +16,7 @@ if __name__ == '__main__':
 
 class gediData(object):
   '''
-  Simulated GEDI data handler
+  GEDI data handler
   '''
 
   def __init__(self,filename=None,minX=-100000000,maxX=100000000,minY=-1000000000,maxY=100000000,outName="teast.h5"):
@@ -576,7 +577,7 @@ if __name__ == '__main__':
     '''
     Read commandline arguments
     '''
-    p = argparse.ArgumentParser(description=("Writes out properties of GEDI waveform files"))
+    p = argparse.ArgumentParser(description=("Script to subset GEDI data. Works on L2A, L2B and L4A files. File format auto detected."))
     p.add_argument("--input",dest="inName",type=str,help=("Input GEDI HDF5 filename"))
     p.add_argument("--bounds", dest ="bounds", type=float,nargs=4,default=[-100000000,-100000000,100000000000,10000000000], help=("Bounds to plot between. minX minY maxX maxY"))
     p.add_argument("--output",dest="output",type=str,default='teast.h5',help=("Output filename"))

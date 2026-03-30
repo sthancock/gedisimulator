@@ -26,6 +26,10 @@ The programs are:
 
 **addNoiseHDF**: Reads waveform data from HDF5 files and adds noise of a chosen level.
 
+**subsetGEDI.py**: Extracts subsets of GEDI L1B, L2A, L2B or L4A data. Outputs in the same HDF5 format.
+
+**gediHandler.py**: Extracts GEDI data from L1B files and can plot coordinates or waveforms
+
 
 To find options, type the above command with "-help". These are explained in full detail later. 
 
@@ -560,6 +564,18 @@ Generates a geotiff from las file properties, combining multiple files. Can also
 
 ## lasPoints ##
 Extracts a point cloud as a pts for a bounding box within a collection of las files.
+
+
+## subsetGEDI.py ##
+
+Subsets GEDI L1B, L2A, L2B or L4A files. Reads in the HDF5 files provided by NASA EarthData and returns a subset file in the same format.
+
+Options are:
+
+
+    --input INNAME                  Input GEDI HDF5 filename (level auto detected)
+    --bounds minX minY maxX maxY    Bounds to subset between in GEDI projection (EPGS:4326)
+    --output OUTPUT                 Output filename
 
 
 ### Contribution guidelines ###
