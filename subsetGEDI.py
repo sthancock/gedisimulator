@@ -577,7 +577,8 @@ if __name__ == '__main__':
     '''
     Read commandline arguments
     '''
-    p = argparse.ArgumentParser(description=("Script to subset GEDI data. Works on L2A, L2B and L4A files. File format auto detected."))
+    p = argparse.ArgumentParser(description=("Script to subset GEDI data. Works on L1B, L2A, L2B and L4A files.\
+                                              Which file type is auto detected."))
     p.add_argument("--input",dest="inName",type=str,help=("Input GEDI HDF5 filename"))
     p.add_argument("--bounds", dest ="bounds", type=float,nargs=4,default=[-100000000,-100000000,100000000000,10000000000], help=("Bounds to plot between. minX minY maxX maxY"))
     p.add_argument("--output",dest="output",type=str,default='teast.h5',help=("Output filename"))
