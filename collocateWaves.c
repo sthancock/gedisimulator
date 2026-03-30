@@ -593,8 +593,8 @@ void writeFinalWaves(control *dimage,dataStruct **lvis,pCloudStruct **als,double
   char waveID[500];
 
   /*how mamy types of simuation methods*/
-  dimage->simIO.useCount=1;
-  dimage->simIO.useFrac=dimage->simIO.useInt=0;
+  /*dimage->simIO.useCount=1;
+  dimage->simIO.useFrac=dimage->simIO.useInt=0;*/
   dimage->simIO.nTypeWaves=(int)(dimage->simIO.useCount+dimage->simIO.useFrac+dimage->simIO.useInt);
   dimage->simIO.ground=1;
   dimage->gediRat.doGrid=1;
