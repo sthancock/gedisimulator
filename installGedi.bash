@@ -17,7 +17,7 @@ HOMDIR="$HOME"
 export ARCH=`uname -m`
 export PATH=$PATH:./:$HOMDIR/bin/$ARCH:$HOMDIR/bin/csh
 export GEDIRAT_ROOT=$HOMDIR/src/gedisimulator
-export CMPFIT_ROOT=$HOMDIR/src/cmpfit-1.2
+export CMPFIT_ROOT=$GEDIRAT_ROOT/packages/cmpfit-1.2
 export GSL_ROOT=/usr/local/lib
 export LIBCLIDAR_ROOT=$HOMDIR/src/libclidar
 export HANCOCKTOOLS_ROOT=$HOMDIR/src/tools
@@ -29,7 +29,7 @@ envFile="$HOMDIR/.bashrc"
 echo "export ARCH=`uname -m`" >> $envFile
 echo "export PATH=$PATH:./:$HOMDIR/bin/$ARCH:$HOMDIR/bin/csh" >> $envFile
 echo "export GEDIRAT_ROOT=$HOMDIR/src/gedisimulator" >> $envFile
-echo "export CMPFIT_ROOT=$HOMDIR/src/cmpfit-1.2" >> $envFile
+echo "export CMPFIT_ROOT=$GEDIRAT_ROOT/packages/cmpfit-1.2" >> $envFile
 echo "export GSL_ROOT=/usr/local/lib" >> $envFile
 echo "export LIBCLIDAR_ROOT=$HOMDIR/src/libclidar" >> $envFile
 echo "export HANCOCKTOOLS_ROOT=$HOMDIR/src/tools" >> $envFile
@@ -55,9 +55,6 @@ pushd $HOMDIR/src
 git clone https://bitbucket.org/StevenHancock/libclidar
 git clone https://bitbucket.org/StevenHancock/tools
 git clone https://bitbucket.org/StevenHancock/gedisimulator
-
-cp gedisimulator/packages/cmpfit-1.2.tar.gz ./
-tar -xvf cmpfit-1.2.tar.gz
 
 programList="gediRat gediMetric mapLidar collocateWaves lasPoints fitTXpulse"
 cd $GEDIRAT_ROOT/

@@ -1,5 +1,7 @@
 # Makefile for GEDI simulator tools
 
+CMPFIT_ROOT = packages/cmpfit-1.2
+
 LIBS = -lm -lgsl -lgslcblas -ltiff -lgeotiff -lhdf5 -L${GSL_ROOT} -lgdal -L${HDF5_LIB}/lib #-L/anaconda3/lib
 INCLS = -I/usr/local/include -I$(HANCOCKTOOLS_ROOT) -I$(CMPFIT_ROOT) -I${LIBCLIDAR_ROOT} -I. -I/usr/include/libgeotiff -I/usr/include/gdal -I${GSL_ROOT} -I${HDF5_LIB}/include  -I/usr/include/hdf5/serial -I/usr/include/geotiff #-I${HDF5_LIB}/include -I/anaconda3/include
 CFLAGS += -Wall 
