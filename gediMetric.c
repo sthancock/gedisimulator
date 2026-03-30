@@ -2758,7 +2758,7 @@ void writeHelp()
 -gTol tol;        ALS ground tolerance. Used to calculate slope.\n\
 -fhdHistRes res;  waveform intensity resolution to use when calculating FHD from histograms\n\
 -forcePsigma;     do not read pulse sigma from file\n\
--bayesGround;     use Bayseian ground finding\n\
+-bayesGround;     use Bayesian ground finding\n\
 -dontTrustGround; don't trust ground in waveforms, if included\n\
 -noRoundCoord;    do not round up coords when outputting\n\
 -noCanopy;        do not calculate FHD histograms and LAI profiles\n\
@@ -2796,7 +2796,7 @@ void writeHelp()
 -nPhotC n;        mean number of canopy photons (replaces nPhotons and rhoVrhoG)\n\
 -nPhotG n;        mean number of ground photons (replaces nPhotons and rhoVrhoG)\n\
 -photHDF;         write photon-counting output in HDF5\n\
--grThresh t;      threshold to devide if photon is ground or canopy\n");
+-grThresh t;      threshold to decide if photon is ground or canopy\n");
   #endif
   fprintf(stdout,"\nPulse-compressed lidar\n\
 -photonPCL;       convert to photon counting pulse-compressed before processing\n\
@@ -2819,7 +2819,7 @@ void writeHelp()
 -msWidth sig;     smoothing width, after noise stats, before denoising\n\
 -preMatchF;       matched filter before denoising\n\
 -postMatchF;      matched filter after denoising\n\
--pFile file;      read pulse file, for deconvoltuion and matched filters\n\
+-pFile file;      read pulse file, for deconvolution and matched filters\n\
 -gWidth sig;      Gaussian parameter selection smoothing width\n\
 -minGsig sig;     minimum Gaussian sigma to fit\n\
 -minWidth n;      minimum feature width in bins\n\
