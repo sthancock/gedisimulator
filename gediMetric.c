@@ -1384,7 +1384,7 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   float tot=0;
   float *mu=NULL,*sig=NULL;
   float *energy=NULL,*A=NULL;
-  float gaussCover(float *,int,float *,float *,int,int);
+  float gaussCover(float *,int,float *,float *,int,int,float);
   double gaussianGround(float *,float *,float *,int *,int,float,float *,dataStruct *,denPar *);
   double maxGround(float *,double *,int);
   double inflGround(float *,double *,int);
@@ -1448,7 +1448,7 @@ void findMetrics(metStruct *metric,float *gPar,int nGauss,float *denoised,float 
   else                    metric->gHeight=metric->gSlope=-1.0;
 
   /*canopy cover*/
-  metric->cov=gaussCover(denoised,nBins,mu,energy,nGauss,gInd);
+  metric->cov=gaussCover(denoised,nBins,mu,energy,nGauss,gInd,dimage->rhoRatio);
 
   /*ground by maximum*/
   metric->maxGround=maxGround(smoothed,z,nBins);
@@ -2003,16 +2003,19 @@ float *blankRH(float rhRes,int *nRH)
 /*####################################################*/
 /*Gaussian canopy cover*/
 
-float gaussCover(float *wave,int nBins,float *mu,float *energy,int nGauss,int gInd)
+float gaussCover(float *wave,int nBins,float *mu,float *energy,int nGauss,int gInd,float rhoRatio)
 {
   int i=0;
-  float cov=0,totE=0;
-
+  float cov=0,totE=0,totC=0;
 
   totE=0.0;
   for(i=0;i<nGauss;i++)totE+=energy[i];
 
-  if((gInd>0)&&(gInd<nGauss))cov=1.0-energy[gInd]/totE;
+  if((gInd>0)&&(gInd<nGauss)){
+    totC=totE-energy[gInd];
+    cov=totC/(totC+energy[gInd]*rhoRatio);
+  }else cov=1.0;
+
   return(cov);
 }/*gaussCover*/
 
