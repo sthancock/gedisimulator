@@ -8,6 +8,7 @@ Script to access simuated GEDI data
 import numpy as np
 import h5py
 from sys import exit
+from pyproj import Transformer
 import matplotlib.pyplot as plt
 if __name__ == '__main__':
   import argparse
@@ -86,7 +87,7 @@ class gediData(object):
 
     # loop over beams
     for b in self.beamList:
-      print(b)
+      print('#',b)
       if((b in list(f))==False): # does this exist?
         continue                 # if not, skip it
       elif(('geolocation' in list(f[b]))==False):  # no data in beam
@@ -164,7 +165,7 @@ class gediData(object):
           self.beamID=np.append(self.beamID,np.full(nWaves,b))
 
       self.nWaves=self.nWaves+nWaves
-      print('Found',self.nWaves)
+      print('# Found',self.nWaves)
 
     # truncate bin lengths if needed
     self.lenInds[self.lenInds>self.nBins]=self.nBins
@@ -545,7 +546,14 @@ class gediData(object):
 
   ###########################################
 
-  def writeCoords(self):
+  def writeCoords(self,epsg):
+    # reproject if needed
+    if(epsg!=4326):
+      reproject = Transformer.from_crs(4326,epsg,always_xy=True)
+      x,y=reproject.transform(self.lon,self.lat)
+      self.lon=x
+      self.lat=y
+
     for i in range(0,len(self.lon)):
       print(self.lon[i],self.lat[i])
 
@@ -568,6 +576,7 @@ if __name__ == '__main__':
     p.add_argument("--outRoot",dest="outRoot",type=str,default='test',help=("Output graph filename root"))
     p.add_argument("--writeCoords",dest="writeCoords", action='store_true', default=False, help=("Write out coordinates insteda of plotting waveforms"))
     p.add_argument("--writeWaves",dest="writeWaves", action='store_true', default=False, help=("Write out csv files of the waveforms"))
+    p.add_argument("--epsg",dest="epsg", default=4326, help=("Output EPSG"))
     cmdargs = p.parse_args()
     return cmdargs
 
@@ -587,7 +596,7 @@ if __name__ == '__main__':
 
   # mode switch
   if(cmdargs.writeCoords):
-    gedi.writeCoords()
+    gedi.writeCoords(cmdargs.epsg)
   elif(cmdargs.writeWaves):
     # write the waveforms
     gedi.writeWaves(outRoot=outRoot)
