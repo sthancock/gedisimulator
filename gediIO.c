@@ -1953,10 +1953,17 @@ double *reprojectWaveBounds(double *inBounds,int inEPSG,int outEPSG)
     y=dalloc(2,"y trans",9);
     z=dalloc(2,"z trans",9);
 
-    x[0]=inBounds[0];
-    y[0]=inBounds[1];
-    x[1]=inBounds[2];
-    y[1]=inBounds[3];
+    if(inEPSG!=4543){
+      x[0]=inBounds[0];
+      y[0]=inBounds[1];
+      x[1]=inBounds[2];
+      y[1]=inBounds[3];
+    }else{
+      y[0]=inBounds[0];
+      x[0]=inBounds[1];
+      y[1]=inBounds[2];
+      x[1]=inBounds[3];
+    }
     z[0]=z[1]=0.0;
 
     hSourceSRS=OSRNewSpatialReference(NULL);

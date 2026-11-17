@@ -1430,8 +1430,13 @@ void copyLvisCoords(gediRatStruct *gediRat,dataStruct **lvis,int nLvis,int aEPSG
 
     for(i=0;i<nLvis;i++){
       gediRat->coords[i]=dalloc(2,"coords",i+1);
-      gediRat->coords[i][0]=x[i];
-      gediRat->coords[i][1]=y[i];
+      if(aEPSG!=4543){
+        gediRat->coords[i][0]=x[i];
+        gediRat->coords[i][1]=y[i];
+      }else{
+        gediRat->coords[i][0]=y[i];
+        gediRat->coords[i][1]=x[i];
+      }
     }
   }else{
     for(i=0;i<nLvis;i++){
